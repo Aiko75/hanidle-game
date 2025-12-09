@@ -2,7 +2,7 @@
 
 import data from "@/../public/data/ihentai_all.json";
 import { useState, useEffect } from "react";
-import ResultRow from "./ResultRow";
+import ResultRow from "../../../components/game/HAnidle/ResultRow";
 
 export default function HAnidle() {
   const [targetAnime, setTargetAnime] = useState(null);
