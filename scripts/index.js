@@ -22,7 +22,7 @@ puppeteer.use(StealthPlugin());
   });
 
   let allData = [];
-  const maxPage = 115;
+  const maxPage = 1;
 
   for (let p = 1; p <= maxPage; p++) {
     const apiURL = `https://ihentai.kim/api/search?page=${p}&limit=24&orderby=date&order=desc&s=`;
@@ -51,7 +51,7 @@ puppeteer.use(StealthPlugin());
 
   // ghi file
   fs.writeFileSync(
-    "ihentai_all.json",
+    "public/data/ihentai_all.json",
     JSON.stringify(allData, null, 2),
     "utf8"
   );

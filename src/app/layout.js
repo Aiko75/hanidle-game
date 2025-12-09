@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  title: "Haiten Super Innova Siêu Tốc Không Buổi",
+  title: "Haiten Super Innova Siêu To Không Buổi",
   description: "Web này gay vl:))",
 };
 
