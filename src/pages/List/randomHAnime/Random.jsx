@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import AnimeCard from "@/components/list/AnimeCard";
+import AnimeCardSkeleton from "@/components/ui/AnimeCardSkeleton";
 
 export default function RandomPage() {
   const [animes, setAnimes] = useState([]);
@@ -16,6 +17,7 @@ export default function RandomPage() {
       const json = await res.json();
 
       if (json.success) {
+        // Giữ delay 800ms để người dùng kịp nhìn thấy hiệu ứng skeleton đẹp mắt
         setTimeout(() => {
           setAnimes(json.data);
           setLoading(false);
@@ -55,7 +57,7 @@ export default function RandomPage() {
           onClick={fetchRandomAnime}
           disabled={loading}
           className={`btn btn-lg px-5 py-3 rounded-pill fw-bold shadow-sm transition-all ${
-            loading ? "btn-secondary" : "btn-gradient-purple"
+            loading ? "btn-secondary cursor-not-allowed" : "btn-gradient-purple"
           }`}
           style={{
             background: loading
@@ -65,25 +67,34 @@ export default function RandomPage() {
             border: "none",
           }}
         >
-          {loading ? (
-            <>
-              <span
-                className="spinner-border spinner-border-sm me-2"
-                role="status"
-                aria-hidden="true"
-              ></span>
-              Đang triệu hồi...
-            </>
-          ) : (
-            "🎲 Triệu hồi x20 ngay!"
-          )}
+          {loading ? "Đang triệu hồi..." : "🎲 Triệu hồi x20 ngay!"}
         </button>
       </div>
 
       {/* --- KHU VỰC HIỂN THỊ KẾT QUẢ --- */}
 
-      {/* 1. Trạng thái chưa có dữ liệu */}
-      {animes.length === 0 && !loading && (
+      <div className="row row-cols-2 row-cols-sm-3 row-cols-md-4 g-4 animate-in fade-in">
+        {/* CASE 1: ĐANG LOADING -> HIỂN THỊ SKELETON */}
+        {loading &&
+          // Tạo mảng ảo 20 phần tử để render 20 cái khung xương
+          Array.from({ length: 20 }).map((_, index) => (
+            <div className="col" key={`skeleton-${index}`}>
+              <AnimeCardSkeleton />
+            </div>
+          ))}
+
+        {/* CASE 2: CÓ DATA -> HIỂN THỊ CARD THẬT */}
+        {!loading &&
+          animes.length > 0 &&
+          animes.map((anime, index) => (
+            <div className="col" key={anime.id || index}>
+              <AnimeCard item={anime} />
+            </div>
+          ))}
+      </div>
+
+      {/* CASE 3: CHƯA CÓ GÌ (INITIAL STATE) */}
+      {!loading && animes.length === 0 && (
         <div className="text-center py-5">
           <div
             className="alert alert-light d-inline-block border shadow-sm px-5 py-4"
@@ -92,20 +103,6 @@ export default function RandomPage() {
             <div className="fs-1 mb-2">👇</div>
             <strong>Bấm nút phía trên để quay 20 bộ ngẫu nhiên!</strong>
           </div>
-        </div>
-      )}
-
-      {/* 2. Hiển thị Grid 20 bộ - TÁI SỬ DỤNG AnimeCard */}
-      {animes.length > 0 && !loading && (
-        // Sử dụng Grid của Bootstrap để chia cột
-        <div className="row row-cols-2 row-cols-sm-3 row-cols-md-4 g-4 animate-in fade-in">
-          {animes.map((anime, index) => (
-            <div className="col" key={anime.id || index}>
-              {/* ✅ GỌI COMPONENT CARD TẠI ĐÂY */}
-              {/* Nó sẽ tự động kế thừa style của AnimeCard bạn đã code */}
-              <AnimeCard item={anime} />
-            </div>
-          ))}
         </div>
       )}
     </div>
