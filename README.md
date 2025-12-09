@@ -3,7 +3,7 @@
 Chào mừng bạn đến với **H-Anidle**, một dự án mã nguồn mở được xây dựng với mục đích giải trí và học tập kỹ thuật (educational & entertainment purposes). Dự án bao gồm thư viện tra cứu và minigame đoán tên Anime (lấy cảm hứng từ Wordle).
 
 ## 🚀 Demo
-Bạn có thể trải nghiệm trực tiếp phiên bản đã deploy tại đây: **[Điền Link Deploy Của Bạn Tại Đây]**
+Bạn có thể trải nghiệm trực tiếp phiên bản đã deploy tại đây: **https://h-ani-guesser.vercel.app/**
 
 ## ⚠️ Tuyên bố miễn trừ trách nhiệm (Disclaimer)
 
@@ -59,7 +59,7 @@ Nếu bạn quan tâm đến repo này, muốn đóng góp ý kiến hoặc trao
 
 A Next.js web application designed for entertainment, featuring an Anime library visualization and a "Wordle-style" guessing game.
 
-🔗 **Live Demo:** [Insert Your Deploy Link Here]
+🔗 **Live Demo:** https://h-ani-guesser.vercel.app/
 
 ## 📖 About The Project
 
