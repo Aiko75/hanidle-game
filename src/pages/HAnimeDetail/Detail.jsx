@@ -7,17 +7,18 @@ import { useParams } from "next/navigation"; // Hook lấy param từ URL
 
 export default function AnimeDetailPage() {
   const params = useParams(); // Lấy ID từ URL (/list/123 -> slugId = 123)
+  const slugId = params?.slugId;
+
   const [anime, setAnime] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (!params.slugId) return;
-    console.log(params.slugId);
+    if (!slugId) return;
 
     const fetchDetail = async () => {
       try {
-        const res = await fetch(`/api/hanimes/detail/${params.slugId}`);
+        const res = await fetch(`/api/hanimes/detail/${slugId}`);
         const json = await res.json();
 
         if (json.success) {
@@ -33,7 +34,7 @@ export default function AnimeDetailPage() {
     };
 
     fetchDetail();
-  }, [params.slugId]);
+  }, [slugId]);
 
   // --- TRẠNG THÁI LOADING / ERROR ---
   if (loading) {
