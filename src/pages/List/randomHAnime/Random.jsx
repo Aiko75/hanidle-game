@@ -34,7 +34,7 @@ export default function RandomPage() {
       {/* Navigation Back */}
       <div className="d-flex justify-content-between align-items-center mb-4">
         <Link
-          href="/"
+          href="/list"
           className="btn btn-outline-secondary btn-sm rounded-pill px-3"
         >
           &larr; Quay lại thư viện
