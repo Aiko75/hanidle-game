@@ -1,17 +1,25 @@
-// src/app/api/random/route.js
 import { NextResponse } from "next/server";
-import pool from "@/lib/db"; // Import connection pool
+import pool from "@/lib/db";
 
-export const dynamic = "force-dynamic"; // Bắt buộc dòng này để tránh Next.js cache kết quả random
+export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(request) {
   try {
+    // 1. Lấy tham số limit từ URL
+    const { searchParams } = new URL(request.url);
+    // Nếu không truyền limit thì mặc định là 20, tối đa cho phép 50
+    let limit = parseInt(searchParams.get("limit") || "20");
+
+    // Validate limit để tránh user truyền số quá lớn
+    if (limit < 1) limit = 1;
+    if (limit > 50) limit = 50;
+
     const client = await pool.connect();
 
-    // Query lấy 1 dòng ngẫu nhiên từ PostgreSQL (hiệu năng cao)
-    const query = "SELECT * FROM animes ORDER BY RANDOM() LIMIT 20";
+    // 2. Query Database với LIMIT động
+    const query = "SELECT * FROM animes ORDER BY RANDOM() LIMIT $1";
+    const result = await client.query(query, [limit]);
 
-    const result = await client.query(query);
     client.release();
 
     if (result.rows.length === 0) {
@@ -21,9 +29,14 @@ export async function GET() {
       );
     }
 
+    // 3. Xử lý dữ liệu trả về linh hoạt
+    // Nếu client xin 1 bộ -> Trả về Object (tiện cho Game)
+    // Nếu client xin nhiều bộ -> Trả về Array (tiện cho Gacha)
+    const responseData = limit === 1 ? result.rows[0] : result.rows;
+
     return NextResponse.json({
       success: true,
-      data: result.rows,
+      data: responseData,
     });
   } catch (error) {
     console.error("Random API Error:", error);

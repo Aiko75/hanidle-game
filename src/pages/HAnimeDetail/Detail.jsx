@@ -51,7 +51,7 @@ export default function AnimeDetailPage() {
     return (
       <div className="min-vh-100 d-flex flex-col justify-content-center align-items-center bg-white text-white">
         <h2 className="text-danger mb-3">⚠️ {error}</h2>
-        <Link href="/list" className="btn btn-outline-light">
+        <Link href="/" className="btn btn-outline-light">
           ← Quay lại trang chủ
         </Link>
       </div>
@@ -64,7 +64,7 @@ export default function AnimeDetailPage() {
       <div className="container">
         {/* Breadcrumb / Back Button */}
         <div className="mb-4">
-          <Link href="/" className="btn btn-outline-secondary rounded-pill">
+          <Link href="/list" className="btn btn-outline-secondary rounded-pill">
             &larr; Thư viện
           </Link>
         </div>
@@ -168,7 +168,7 @@ export default function AnimeDetailPage() {
                       <tr>
                         <td className="fw-bold text-muted">Censorship:</td>
                         <td className="text-capitalize">
-                          {anime.censorship || "Unknown"}
+                          {anime.raw_data.censorship || "Unknown"}
                         </td>
                       </tr>
                       <tr>
