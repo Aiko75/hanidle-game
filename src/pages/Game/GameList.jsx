@@ -21,16 +21,15 @@ export default function GameList() {
       status: "active", // active | coming_soon | maintenance
       color: "primary",
     },
-    // {
-    //   id: "gacha",
-    //   name: "Waifu Gacha",
-    //   description:
-    //     "Test nhân phẩm với hệ thống triệu hồi nhân vật ngẫu nhiên (Demo).",
-    //   icon: "🎰",
-    //   path: "/list/random", // Link sang trang random mình đã làm
-    //   status: "active",
-    //   color: "warning",
-    // },
+    {
+      id: "hentexto",
+      name: "HenTexto",
+      description: "Contexto phien ban HAnime.",
+      icon: "🐈‍",
+      path: "/game/hentexto",
+      status: "active",
+      color: "info",
+    },
     // {
     //   id: "quiz",
     //   name: "Music Quiz",
@@ -132,7 +131,7 @@ export default function GameList() {
                       <button
                         className={`btn btn-${game.color} w-100 fw-bold rounded-pill`}
                       >
-                        Chơi Ngay 🚀
+                        Chơi Ngay
                       </button>
                     ) : (
                       <button

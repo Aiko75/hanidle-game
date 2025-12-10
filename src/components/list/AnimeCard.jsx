@@ -38,7 +38,7 @@ export default function AnimeCard({ item }) {
 
         {/* Metadata Footer */}
         <div className="flex justify-between items-center text-[10px] text-zinc-500 dark:text-zinc-400 px-1 mt-auto">
-          <span>{item.releaseYear?.name || "N/A"}</span>
+          <span>{item.releaseYear?.name || item.release_year}</span>
           <span className="flex items-center gap-1">
             👁️{" "}
             {new Intl.NumberFormat("en-US", {
