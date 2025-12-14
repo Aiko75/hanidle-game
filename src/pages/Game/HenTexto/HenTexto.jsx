@@ -13,7 +13,7 @@ export default function HanidleGamePage() {
   const [winItem, setWinItem] = useState(null);
 
   // --- STATE CHO GỢI Ý ---
-  const [hintsUsed, setHintsUsed] = useState(0); // Số gợi ý người dùng ĐÃ BẤM mở
+  const [hintsUsed, setHintsUsed] = useState(0);
 
   // 1. KHỞI TẠO GAME
   useEffect(() => {
@@ -28,58 +28,53 @@ export default function HanidleGamePage() {
       .catch((err) => console.error("Lỗi khởi tạo game:", err));
   }, []);
 
-  // 2. TÍNH TOÁN LOGIC GỢI Ý (Derived State)
+  // 2. LOGIC GỢI Ý
   const hintLogic = useMemo(() => {
     const guessCount = guesses.length;
     let earned = 0;
 
-    // Logic: Xuất hiện sau 4 lần đoán đầu tiên
+    // Logic tích điểm gợi ý
     if (guessCount >= 4) {
-      earned = 1; // 4 lần đầu tặng 1 cái
-      // Sau đó cứ 2 lần đoán tặng thêm 1 cái
+      earned = 1;
       earned += Math.floor((guessCount - 4) / 2);
     }
 
     const available = earned - hintsUsed;
 
-    // Chuẩn bị danh sách dữ liệu để hiển thị theo thứ tự: Genre -> Studio -> Year
     let revealList = [];
     if (secretAnime) {
-      // Thêm Genres
       if (secretAnime.genres) {
         revealList.push(
           ...secretAnime.genres.map((g) => ({
             type: "Genre",
             value: g.name,
-            color: "bg-info",
+            color: "bg-info bg-opacity-10 text-info border-info",
           }))
         );
       }
-      // Thêm Studios
       if (secretAnime.studios) {
         revealList.push(
           ...secretAnime.studios.map((s) => ({
             type: "Studio",
             value: s.name,
-            color: "bg-warning",
+            color: "bg-warning bg-opacity-10 text-warning border-warning",
           }))
         );
       }
-      // Thêm Năm
       if (secretAnime.release_year) {
         revealList.push({
           type: "Year",
           value: secretAnime.release_year,
-          color: "bg-secondary",
+          color: "bg-secondary bg-opacity-10 text-secondary border-secondary",
         });
       }
     }
 
     return {
-      available, // Số lượng hint đang có để bấm
-      nextUnlock: guessCount < 4 ? 4 - guessCount : 2 - ((guessCount - 4) % 2), // Bao lâu nữa có hint mới
-      revealList, // Danh sách toàn bộ hint
-      isMaxed: hintsUsed >= revealList.length, // Đã mở hết sạch sành sanh chưa
+      available,
+      nextUnlock: guessCount < 4 ? 4 - guessCount : 2 - ((guessCount - 4) % 2),
+      revealList,
+      isMaxed: hintsUsed >= revealList.length,
     };
   }, [guesses.length, hintsUsed, secretAnime]);
 
@@ -122,83 +117,120 @@ export default function HanidleGamePage() {
     }
   };
 
+  // --- LOADING STATE ---
   if (!secretAnime) {
     return (
-      <div className="min-vh-100 d-flex justify-content-center align-items-center bg-dark text-white">
-        <div className="spinner-border text-primary me-2"></div> Đang tạo đề
-        bài...
+      <div className="min-vh-100 d-flex flex-column justify-content-center align-items-center bg-light">
+        <div className="spinner-border text-primary mb-3" role="status"></div>
+        <h5 className="text-muted">Đang thiết lập hồ sơ bí mật...</h5>
       </div>
     );
   }
 
   return (
-    <div
-      className="min-vh-100 w-100 d-flex flex-col align-items-center py-5"
-      style={{
-        background: "linear-gradient(135deg, #1e130c 0%, #9a8478 100%)",
-        color: "white",
-      }}
-    >
-      <div className="container text-center mb-4">
-        <Link
-          href="/game"
-          className="btn btn-outline-light btn-sm rounded-pill mb-3"
-        >
-          &larr; Thoát Game
-        </Link>
-        <h1 className="display-4 fw-bold">H-Anidle Contexto</h1>
-        <p className="lead text-white-50">
-          Tìm kiếm bộ Anime bí mật. Đoán tên để xem độ chính xác!
-        </p>
-      </div>
-
-      {winItem && (
-        <div className="container mb-5 animate-in zoom-in duration-500">
-          <div className="alert alert-success text-center shadow-lg border-0 p-4 rounded-4">
-            <h2 className="fw-bold mb-3">🎉 CHÚC MỪNG! BẠN ĐÃ TÌM RA!</h2>
-            <div className="d-flex justify-content-center">
-              <div style={{ maxWidth: "280px" }}>
-                <AnimeCard item={winItem} />
-              </div>
-            </div>
-            <button
-              className="btn btn-success btn-lg mt-4 rounded-pill px-5 fw-bold"
-              onClick={() => window.location.reload()}
+    <div className="min-vh-100 bg-light pb-5">
+      {/* --- HEADER NAVIGATION --- */}
+      <nav className="navbar navbar-expand-lg navbar-light bg-white shadow-sm sticky-top mb-4">
+        <div className="container">
+          <div className="d-flex align-items-center gap-3">
+            <Link
+              href="/game"
+              className="btn btn-outline-secondary rounded-pill px-3 fw-bold btn-sm"
             >
-              Chơi ván mới 🔄
-            </button>
+              <i className="bi bi-arrow-left"></i> Back
+            </Link>
+            <span className="navbar-brand mb-0 h1 fw-bold text-primary d-none d-sm-block">
+              HenTexto
+            </span>
+          </div>
+
+          <div className="d-flex align-items-center gap-2 text-muted fw-bold font-monospace">
+            <span className="d-none d-md-inline">Guesses:</span>
+            <span className="badge bg-dark rounded-pill px-3">
+              {guesses.length}
+            </span>
           </div>
         </div>
-      )}
+      </nav>
 
-      {!winItem && (
-        <div className="container d-flex flex-column align-items-center w-100">
-          <GameSearch onGuess={handleGuess} disabled={loading} />
+      {/* --- MAIN GAME CONTAINER --- */}
+      <div className="container d-flex flex-column align-items-center animate-in fade-in">
+        {/* --- HEADER TEXT --- */}
+        {!winItem && (
+          <div className="text-center mb-4">
+            <h2 className="fw-bold text-dark">Truy tìm Anime</h2>
+            <p className="text-muted">
+              Đoán tên phim và xem bạn đang ở "gần" hay "xa" đáp án!
+            </p>
+          </div>
+        )}
 
+        {/* --- WIN STATE --- */}
+        {winItem && (
           <div
-            className="d-flex justify-content-between w-100 mt-3 px-2"
+            className="w-100 mb-5 animate-in zoom-in duration-500"
+            style={{ maxWidth: "500px" }}
+          >
+            <div className="card border-0 shadow-lg overflow-hidden rounded-4">
+              <div className="card-header bg-success text-white text-center py-3">
+                <h3 className="fw-bold mb-0">🎉 CHÍNH XÁC!</h3>
+              </div>
+              <div className="card-body text-center p-4 bg-white">
+                <p className="text-muted mb-3">Đáp án bí mật chính là:</p>
+
+                <div className="d-flex justify-content-center mb-4">
+                  <div style={{ maxWidth: "240px", width: "100%" }}>
+                    <AnimeCard item={winItem} />
+                  </div>
+                </div>
+
+                <button
+                  className="btn btn-success btn-lg rounded-pill px-5 fw-bold shadow-sm hover-scale"
+                  onClick={() => window.location.reload()}
+                >
+                  Chơi ván mới 🔄
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* --- GAMEPLAY AREA --- */}
+        {!winItem && (
+          <div
+            className="w-100 d-flex flex-column align-items-center"
             style={{ maxWidth: "600px" }}
           >
-            <div className="text-white-50">
-              Lượt đoán:{" "}
-              <span className="fw-bold text-white">{guesses.length}</span>
+            {/* 1. SEARCH INPUT */}
+            <div className="w-100 mb-3 shadow-sm rounded-4 bg-white border p-1">
+              <GameSearch onGuess={handleGuess} disabled={loading} />
             </div>
 
-            {/* --- UI GỢI Ý --- */}
-            <div className="d-flex align-items-center gap-2">
-              {hintLogic.nextUnlock > 0 && !hintLogic.isMaxed && (
-                <small className="text-white-50 fst-italic me-2">
-                  (+1 gợi ý sau {hintLogic.nextUnlock} lượt)
-                </small>
-              )}
+            {/* 2. STATS & HINT BAR */}
+            <div className="w-100 d-flex justify-content-between align-items-center mb-3 px-2">
+              {/* Text thông báo lượt mở Hint tiếp theo */}
+              <div className="text-muted fst-italic small">
+                {hintLogic.nextUnlock > 0 && !hintLogic.isMaxed ? (
+                  <span>
+                    <i className="bi bi-clock-history me-1"></i> Hint mới sau{" "}
+                    <strong>{hintLogic.nextUnlock}</strong> lượt
+                  </span>
+                ) : (
+                  <span>
+                    <i className="bi bi-check-circle-fill text-success me-1"></i>{" "}
+                    Sẵn sàng
+                  </span>
+                )}
+              </div>
 
+              {/* Nút bấm Hint */}
               <button
                 onClick={handleUseHint}
                 disabled={hintLogic.available <= 0 || hintLogic.isMaxed}
-                className={`btn btn-sm rounded-pill d-flex align-items-center gap-1 shadow-sm transition-all ${
+                className={`btn btn-sm rounded-pill d-flex align-items-center gap-2 shadow-sm transition-all border ${
                   hintLogic.available > 0
-                    ? "btn-warning text-dark fw-bold hover-scale"
-                    : "btn-secondary opacity-50"
+                    ? "btn-white text-primary border-primary hover-scale fw-bold"
+                    : "btn-light text-muted border-0"
                 }`}
               >
                 <span>💡 Gợi ý</span>
@@ -209,33 +241,38 @@ export default function HanidleGamePage() {
                 )}
               </button>
             </div>
-          </div>
 
-          {/* --- HIỂN THỊ CÁC GỢI Ý ĐÃ MỞ --- */}
-          {hintsUsed > 0 && (
-            <div
-              className="w-100 mt-3 p-3 rounded-3 bg-black bg-opacity-25 animate-in fade-in"
-              style={{ maxWidth: "600px" }}
-            >
-              <h6 className="text-white-50 text-uppercase fw-bold text-xs mb-2">
-                Thông tin đã mở khóa:
-              </h6>
-              <div className="d-flex flex-wrap gap-2">
-                {hintLogic.revealList.slice(0, hintsUsed).map((hint, idx) => (
-                  <span
-                    key={idx}
-                    className={`badge ${hint.color} text-dark border border-white border-opacity-25 px-3 py-2 animate-in zoom-in`}
-                  >
-                    {hint.type}: <strong>{hint.value}</strong>
-                  </span>
-                ))}
+            {/* 3. HIỂN THỊ HINTS ĐÃ MỞ (Nằm trong khung trắng đẹp) */}
+            {hintsUsed > 0 && (
+              <div className="w-100 mb-4 bg-white p-3 rounded-4 shadow-sm border border-light animate-in fade-in">
+                <h6
+                  className="text-muted text-uppercase fw-bold mb-3"
+                  style={{ fontSize: "0.75rem" }}
+                >
+                  <i className="bi bi-unlock-fill me-2"></i>Thông tin đã giải
+                  mã:
+                </h6>
+                <div className="d-flex flex-wrap gap-2">
+                  {hintLogic.revealList.slice(0, hintsUsed).map((hint, idx) => (
+                    <span
+                      key={idx}
+                      className={`badge ${hint.color} border px-3 py-2 animate-in zoom-in text-dark fw-normal`}
+                    >
+                      <span className="opacity-50 me-1">{hint.type}:</span>
+                      <span className="fw-bold">{hint.value}</span>
+                    </span>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          <GuessLog guesses={guesses} />
-        </div>
-      )}
+            {/* 4. LIST GUESSES */}
+            <div className="w-100">
+              <GuessLog guesses={guesses} />
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

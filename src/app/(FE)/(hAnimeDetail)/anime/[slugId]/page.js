@@ -1,4 +1,4 @@
-import HAnimeDetail from "@/pages/HAnimeDetail/Detail";
+import HAnimeDetail from "@/pages/List/HAnimeDetail/Detail";
 
 export default function Page() {
   return <HAnimeDetail />;
