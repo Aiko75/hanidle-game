@@ -29,8 +29,10 @@ export default function Homepage() {
           <span className="text-primary">Hub</span>
         </h1>
         <p className="lead text-white-50">
-          Cổng thông tin giải trí & Thư viện Anime tối thượng
+          Cổng thông tin giải trí & Thư viện HAnime tối thượng(câu này AI gen
+          chứ tôi ko có viết:)))
         </p>
+        <p className="lead text-white-50">Dữ liệu được lấy từ: 9/12/2025</p>
       </div>
 
       {/* Navigation Cards */}

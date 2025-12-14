@@ -2,6 +2,8 @@
 
 Chào mừng bạn đến với **H-Anidle**, một dự án mã nguồn mở được xây dựng với mục đích giải trí và học tập kỹ thuật (educational & entertainment purposes). Dự án bao gồm thư viện tra cứu và minigame đoán tên Anime (lấy cảm hứng từ Wordle).
 
+Lưu ý: Dữ liệu được lấy từ 9/12/2025
+
 ## 🚀 Demo
 Bạn có thể trải nghiệm trực tiếp phiên bản đã deploy tại đây: **https://h-ani-guesser.vercel.app/**
 
