@@ -29,6 +29,17 @@ export default function ResultRow({ guess, target }) {
   // 5. Title
   const isTitleCorrect = guess.id === target.id;
 
+  // 6. View
+  const formatViewCount = (num) => {
+    if (!num) return "0";
+
+    // Sử dụng chuẩn formatter của JS
+    return new Intl.NumberFormat("en-US", {
+      notation: "compact",
+      maximumFractionDigits: 1, // Chỉ lấy 1 số thập phân (vd: 3.6m thay vì 3.62m)
+    }).format(num);
+  };
+
   return (
     <div className="bg-zinc-800 rounded-lg p-4 md:p-0 md:bg-transparent flex flex-col md:grid md:grid-cols-7 gap-2 animate-in fade-in slide-in-from-top-4 duration-500">
       {/* Cột 1: Info (Chiếm 3 cột để hiển thị đủ tags) */}
@@ -45,7 +56,7 @@ export default function ResultRow({ guess, target }) {
           />
           <div className="flex flex-col w-full">
             <p
-              className="font-bold text-sm line-clamp-2 text-white"
+              className="font-bold text-sm line-clamp-2 text-black"
               title={guess.title}
             >
               {guess.title}
@@ -90,7 +101,7 @@ export default function ResultRow({ guess, target }) {
       {/* Cột 4: Views (Có mũi tên) */}
       <InfoBox
         label="Views"
-        value={new Intl.NumberFormat().format(guess.views)}
+        value={formatViewCount(guess.views)}
         isCorrect={isViewCorrect}
         arrow={viewArrow}
       />
