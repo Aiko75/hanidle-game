@@ -30,15 +30,15 @@ export default function GameList() {
       status: "active",
       color: "info",
     },
-    // {
-    //   id: "quiz",
-    //   name: "Music Quiz",
-    //   description: "Nghe nhạc đoán tên Opening/Ending. Sắp ra mắt!",
-    //   icon: "🎵",
-    //   path: "#",
-    //   status: "coming_soon",
-    //   color: "secondary",
-    // },
+    {
+      id: "hentohen",
+      name: "HenToHen",
+      description: "Immaculate Grid phien ban HAnime.",
+      icon: "🐈‍",
+      path: "/game/hentohen",
+      status: "active",
+      color: "info",
+    },
   ];
 
   return (
