@@ -39,6 +39,15 @@ export default function GameList() {
       status: "active",
       color: "info",
     },
+    {
+      id: "Hengo",
+      name: "Hengo",
+      description: "Bingo phien ban HAnime.",
+      icon: "🥀",
+      path: "/game/bingo",
+      status: "active",
+      color: "info",
+    },
   ];
 
   return (
