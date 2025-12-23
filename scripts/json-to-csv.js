@@ -24,6 +24,8 @@ async function convert() {
 
   const inputPath = path.join(__dirname, "../public/data/ihentai_all.json");
   const outputPath = path.join(__dirname, "../public/data/ihentai_all.csv");
+  // const inputPath = path.join(__dirname, "../public/data/anime_full.json");
+  // const outputPath = path.join(__dirname, "../public/data/anime_full.csv");
 
   if (!fs.existsSync(inputPath)) {
     console.error(`❌ Không tìm thấy file tại: ${inputPath}`);

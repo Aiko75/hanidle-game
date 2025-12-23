@@ -11,11 +11,9 @@ export default function HanidleGamePage() {
   const [loading, setLoading] = useState(false);
   const [secretAnime, setSecretAnime] = useState(null);
   const [winItem, setWinItem] = useState(null);
-
-  // --- STATE CHO GỢI Ý ---
+  const [lastGuess, setLastGuess] = useState(null);
   const [hintsUsed, setHintsUsed] = useState(0);
 
-  // 1. KHỞI TẠO GAME
   useEffect(() => {
     fetch("/api/hanimes/random?limit=1")
       .then((res) => res.json())
@@ -28,19 +26,14 @@ export default function HanidleGamePage() {
       .catch((err) => console.error("Lỗi khởi tạo game:", err));
   }, []);
 
-  // 2. LOGIC GỢI Ý
   const hintLogic = useMemo(() => {
     const guessCount = guesses.length;
     let earned = 0;
-
-    // Logic tích điểm gợi ý
     if (guessCount >= 4) {
       earned = 1;
       earned += Math.floor((guessCount - 4) / 2);
     }
-
     const available = earned - hintsUsed;
-
     let revealList = [];
     if (secretAnime) {
       if (secretAnime.genres) {
@@ -69,7 +62,6 @@ export default function HanidleGamePage() {
         });
       }
     }
-
     return {
       available,
       nextUnlock: guessCount < 4 ? 4 - guessCount : 2 - ((guessCount - 4) % 2),
@@ -104,7 +96,10 @@ export default function HanidleGamePage() {
       if (json.success) {
         const rank = json.rank;
         const newGuess = { ...anime, rank: rank };
+        setLastGuess(newGuess);
+
         const updatedGuesses = [newGuess, ...guesses];
+        // Sort danh sách chính theo Rank (gần nhất lên đầu)
         updatedGuesses.sort((a, b) => a.rank - b.rank);
         setGuesses(updatedGuesses);
 
@@ -117,12 +112,11 @@ export default function HanidleGamePage() {
     }
   };
 
-  // --- LOADING STATE ---
   if (!secretAnime) {
     return (
       <div className="min-vh-100 d-flex flex-column justify-content-center align-items-center bg-light">
         <div className="spinner-border text-primary mb-3" role="status"></div>
-        <h5 className="text-muted">Đang thiết lập hồ sơ bí mật...</h5>
+        <h5 className="text-muted">Vui lòng chờ một chút, game đang lọ...</h5>
       </div>
     );
   }
@@ -160,7 +154,7 @@ export default function HanidleGamePage() {
           <div className="text-center mb-4">
             <h2 className="fw-bold text-dark">Truy tìm Anime</h2>
             <p className="text-muted">
-              Đoán tên phim và xem bạn đang ở "gần" hay "xa" đáp án!
+              Đoán tên Haiten và xem bạn đang ở "gần" hay "xa" đáp án!
             </p>
           </div>
         )}
@@ -201,14 +195,55 @@ export default function HanidleGamePage() {
             className="w-100 d-flex flex-column align-items-center"
             style={{ maxWidth: "600px" }}
           >
-            {/* 1. SEARCH INPUT */}
+            {/* 3. HIỂN THỊ BỘ VỪA ĐOÁN (LAST GUESS) */}
+            {lastGuess && (
+              <div className="w-100 mb-3 animate-in slide-in-from-top fade-in">
+                <div className="bg-white p-3 rounded-4 shadow-sm border border-primary border-opacity-25 d-flex align-items-center gap-3">
+                  {/* Ảnh Thumbnail */}
+                  <div style={{ width: "60px", height: "80px", flexShrink: 0 }}>
+                    <img
+                      src={lastGuess.thumbnail}
+                      alt={lastGuess.title}
+                      className="w-100 h-100 object-fit-cover rounded-3 shadow-sm"
+                    />
+                  </div>
+
+                  {/* Thông tin */}
+                  <div className="flex-grow-1 overflow-hidden">
+                    <div className="d-flex justify-content-between align-items-start mb-1">
+                      <small
+                        className="text-muted text-uppercase fw-bold"
+                        style={{ fontSize: "0.7rem" }}
+                      >
+                        Vừa đoán:
+                      </small>
+                      <span
+                        className={`badge rounded-pill ${
+                          lastGuess.rank === 1
+                            ? "bg-success"
+                            : lastGuess.rank <= 10
+                            ? "bg-warning text-dark"
+                            : "bg-secondary"
+                        }`}
+                      >
+                        #{lastGuess.rank}
+                      </span>
+                    </div>
+                    <h6 className="fw-bold text-dark mb-0 text-truncate">
+                      {lastGuess.title}
+                    </h6>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* SEARCH INPUT */}
             <div className="w-100 mb-3 shadow-sm rounded-4 bg-white border p-1">
               <GameSearch onGuess={handleGuess} disabled={loading} />
             </div>
 
-            {/* 2. STATS & HINT BAR */}
+            {/* STATS & HINT BAR */}
             <div className="w-100 d-flex justify-content-between align-items-center mb-3 px-2">
-              {/* Text thông báo lượt mở Hint tiếp theo */}
               <div className="text-muted fst-italic small">
                 {hintLogic.nextUnlock > 0 && !hintLogic.isMaxed ? (
                   <span>
@@ -223,7 +258,6 @@ export default function HanidleGamePage() {
                 )}
               </div>
 
-              {/* Nút bấm Hint */}
               <button
                 onClick={handleUseHint}
                 disabled={hintLogic.available <= 0 || hintLogic.isMaxed}
@@ -242,7 +276,7 @@ export default function HanidleGamePage() {
               </button>
             </div>
 
-            {/* 3. HIỂN THỊ HINTS ĐÃ MỞ (Nằm trong khung trắng đẹp) */}
+            {/* HIỂN THỊ HINTS ĐÃ MỞ */}
             {hintsUsed > 0 && (
               <div className="w-100 mb-4 bg-white p-3 rounded-4 shadow-sm border border-light animate-in fade-in">
                 <h6
@@ -266,7 +300,7 @@ export default function HanidleGamePage() {
               </div>
             )}
 
-            {/* 4. LIST GUESSES */}
+            {/* LIST GUESSES (Xếp hạng) */}
             <div className="w-100">
               <GuessLog guesses={guesses} />
             </div>
