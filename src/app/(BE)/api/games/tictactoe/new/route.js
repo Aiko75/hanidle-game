@@ -3,7 +3,6 @@ import animeData from "@/../public/data/ihentai_all.json";
 
 // Cấu hình
 const MIN_ANIME_VIEWS = 1000; // Lọc bỏ bộ ít view
-const ATTEMPTS_LIMIT = 50;
 
 // Helper: Trích xuất thuộc tính từ JSON của bạn
 function extractAttributes(data) {
@@ -77,12 +76,12 @@ export async function GET() {
     let board = null;
     let attempts = 0;
 
-    while (!board && attempts < ATTEMPTS_LIMIT) {
+    while (!board) {
       attempts++;
 
-      const getRandomAttr = (excludeType = null) => {
+      const getRandomAttr = (excludeTypes = []) => {
         const types = ["Genre", "Studio", "Year"].filter(
-          (t) => t !== excludeType
+          (t) => !excludeTypes.includes(t)
         );
         const type = types[Math.floor(Math.random() * types.length)];
 
@@ -97,7 +96,10 @@ export async function GET() {
         return { type, value };
       };
 
-      const rows = [getRandomAttr(), getRandomAttr(), getRandomAttr()];
+      const r1 = getRandomAttr();
+      const r2 = getRandomAttr();
+      const r3 = getRandomAttr();
+      const rows = [r1, r2, r3];
       const cols = [];
 
       // Tạo cột, cố gắng tránh trùng loại với hàng để game đa dạng
@@ -141,12 +143,16 @@ export async function GET() {
 
     if (!board) {
       return NextResponse.json(
-        { success: false, message: "Failed to generate board, try again" },
+        {
+          success: false,
+          message: "Failed to generate board, try again",
+          att: attempts,
+        },
         { status: 500 }
       );
     }
 
-    return NextResponse.json({ success: true, board });
+    return NextResponse.json({ success: true, board, att: attempts });
   } catch (error) {
     console.error(error);
     return NextResponse.json(

@@ -60,7 +60,7 @@ export default function AnimeDetailPage() {
 
   // --- GIAO DIỆN CHÍNH ---
   return (
-    <div className="bg-zinc-50 dark:bg-black min-vh-100 py-5 text-black dark:text-white">
+    <div className="bg-zinc-50 min-vh-100 py-5 text-black">
       <div className="container">
         {/* Breadcrumb / Back Button */}
         <div className="mb-4">
@@ -121,7 +121,7 @@ export default function AnimeDetailPage() {
                 Nội dung
               </h4>
               <p
-                className="lead fs-6 text-secondary dark:text-gray-300"
+                className="lead fs-6 text-secondary"
                 style={{ lineHeight: "1.8" }}
               >
                 {anime.synopsis || "Chưa có mô tả cho bộ này."}
@@ -134,8 +134,8 @@ export default function AnimeDetailPage() {
                 <h5 className="text-muted mb-3 text-uppercase fw-bold text-sm">
                   Thông tin khác
                 </h5>
-                <div className="bg-white dark:bg-zinc-900 rounded-3 p-4 shadow-sm">
-                  <table className="table table-borderless mb-0 dark:text-white">
+                <div className="bg-white rounded-3 p-4 shadow-sm">
+                  <table className="table table-borderless mb-0 ">
                     <tbody>
                       <tr>
                         <td className="fw-bold text-muted w-25">Studio:</td>
