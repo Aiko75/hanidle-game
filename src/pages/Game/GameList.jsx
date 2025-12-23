@@ -37,7 +37,7 @@ export default function GameList() {
       icon: "🐈‍",
       path: "/game/hentohen",
       status: "active",
-      color: "info",
+      color: "success",
     },
     {
       id: "Hengo",
@@ -46,7 +46,7 @@ export default function GameList() {
       icon: "🥀",
       path: "/game/bingo",
       status: "active",
-      color: "info",
+      color: "danger",
     },
   ];
 

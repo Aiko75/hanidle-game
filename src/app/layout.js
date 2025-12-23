@@ -14,13 +14,13 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  title: "Haiten Super Innova Siêu To Không Buổi",
+  title: "Haiten Super Innova Siêu To Khổng Buồi",
   description: "Web này gay vl:))",
 };
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en">
+    <html lang="en" data-bs-theme="light">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >

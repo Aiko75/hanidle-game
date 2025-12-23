@@ -8,7 +8,7 @@ export default function FilterBar({
   onReset, // Hàm reset
 }) {
   return (
-    <div className="bg-white dark:bg-zinc-900 p-6 rounded-xl shadow-sm mb-8 space-y-4">
+    <div className="bg-white p-6 rounded-xl shadow-sm mb-8 space-y-4">
       {/* Hàng 1: Dropdown cơ bản */}
       <div className="flex flex-col md:flex-row gap-4">
         {/* Genre Select */}
@@ -35,7 +35,7 @@ export default function FilterBar({
           <select
             value={filters.sortBy}
             onChange={(e) => onUpdate("sortBy", e.target.value)}
-            className="w-full p-2 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-black dark:text-white border border-zinc-200 dark:border-zinc-700 outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full p-2 rounded-lg bg-zinc-100 text-black border border-zinc-200 outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="newest">Năm (Mới nhất)</option>
             <option value="oldest">Năm (Cũ nhất)</option>
@@ -45,7 +45,7 @@ export default function FilterBar({
         </div>
       </div>
 
-      <hr className="border-zinc-200 dark:border-zinc-700" />
+      <hr className="border-zinc-200" />
 
       {/* Hàng 2: Range Filters */}
       <div className="flex flex-col md:flex-row gap-6">
@@ -93,7 +93,7 @@ function FilterSelect({ label, value, onChange, options }) {
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full p-2 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-black dark:text-white border border-zinc-200 dark:border-zinc-700 outline-none focus:ring-2 focus:ring-blue-500"
+        className="w-full p-2 rounded-lg bg-zinc-100 text-black border-zinc-200 outline-none focus:ring-2 focus:ring-blue-500"
       >
         {options.map((opt) => (
           <option key={opt} value={opt}>
@@ -125,7 +125,7 @@ function RangeInput({
           placeholder={placeholderMin}
           value={minVal}
           onChange={(e) => onMinChange(e.target.value)}
-          className="w-full p-2 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-black dark:text-white border border-zinc-200 dark:border-zinc-700 text-sm"
+          className="w-full p-2 rounded-lg bg-zinc-100 text-black border-zinc-200 text-sm"
         />
         <span className="text-zinc-400">-</span>
         <input
@@ -133,7 +133,7 @@ function RangeInput({
           placeholder={placeholderMax}
           value={maxVal}
           onChange={(e) => onMaxChange(e.target.value)}
-          className="w-full p-2 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-black dark:text-white border border-zinc-200 dark:border-zinc-700 text-sm"
+          className="w-full p-2 rounded-lg bg-zinc-100 text-black border-zinc-200 text-sm"
         />
       </div>
     </div>

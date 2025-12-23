@@ -11,12 +11,72 @@ export default function TicTacToePage() {
       .fill(null)
       .map(() => Array(3).fill(null))
   );
-  // selectedCell giờ sẽ dùng để highlight ô đang chọn thay vì mở modal
   const [selectedCell, setSelectedCell] = useState(null);
   const [loading, setLoading] = useState(true);
   const [lives, setLives] = useState(9);
 
-  // 1. Load đề bài
+  // --- CẤU HÌNH GIAO DIỆN (Dễ dàng chỉnh sửa tại đây) ---
+  const styles = {
+    // Container bao ngoài cùng
+    wrapper: {
+      width: "100%",
+      maxWidth: "800px",
+      margin: "0 auto",
+      padding: "10px",
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+    },
+    // Bảng Grid
+    container: {
+      display: "flex",
+      flexDirection: "column",
+      gap: "clamp(4px, 1.5vw, 12px)", // Giãn cách tự co theo màn hình
+      padding: "clamp(10px, 3vw, 25px)",
+      backgroundColor: "white",
+      borderRadius: "24px",
+      boxShadow: "0 20px 40px rgba(0,0,0,0.05)",
+      width: "100%",
+      maxWidth: "fit-content",
+    },
+    row: {
+      display: "flex",
+      gap: "clamp(4px, 1.5vw, 12px)",
+    },
+    cellBase: {
+      // Ô sẽ có kích thước từ 70px (mobile) đến 150px (desktop)
+      width: "clamp(75px, 20vw, 150px)",
+      height: "clamp(75px, 20vw, 150px)",
+      borderRadius: "clamp(8px, 2vw, 16px)",
+      display: "flex",
+      flexDirection: "column",
+      justifyContent: "center",
+      alignItems: "center",
+      transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+      position: "relative",
+      overflow: "hidden",
+      fontSize: "clamp(0.6rem, 1.5vw, 0.9rem)", // Font chữ cũng co giãn
+    },
+    headerCell: (isRow) => ({
+      backgroundColor: isRow ? "#f0fdf4" : "#f0f9ff", // Màu xanh lá nhẹ cho hàng, xanh dương cho cột
+      border: "1px solid rgba(0,0,0,0.05)",
+      textAlign: "center",
+      padding: "5px",
+    }),
+    playableCell: (isSelected, hasData) => ({
+      backgroundColor: "#ffffff",
+      cursor: hasData ? "default" : "pointer",
+      border: isSelected
+        ? "3px solid #fd7e14"
+        : hasData
+        ? "none"
+        : "1.5px dashed #cbd5e1",
+      transform: isSelected ? "scale(1.05)" : "scale(1)",
+      boxShadow: isSelected ? "0 10px 20px rgba(253, 126, 20, 0.2)" : "none",
+      zIndex: isSelected ? 10 : 1,
+    }),
+  };
+
   useEffect(() => {
     fetch("/api/games/tictactoe/new")
       .then((res) => res.json())
@@ -26,20 +86,18 @@ export default function TicTacToePage() {
       });
   }, []);
 
-  // 2. Xử lý đoán
   const handleGuess = async (anime) => {
     if (!selectedCell || !board) return;
     const { r, c } = selectedCell;
-
-    // Nếu ô này đã có dữ liệu rồi thì chặn, không cho điền đè (hoặc tùy bạn)
     if (gridState[r][c]) return;
-
-    const rowAttr = board.rows[r];
-    const colAttr = board.cols[c];
 
     const res = await fetch("/api/games/tictactoe/check", {
       method: "POST",
-      body: JSON.stringify({ animeId: anime.id, rowAttr, colAttr }),
+      body: JSON.stringify({
+        animeId: anime.id,
+        rowAttr: board.rows[r],
+        colAttr: board.cols[c],
+      }),
     });
     const json = await res.json();
 
@@ -47,86 +105,36 @@ export default function TicTacToePage() {
       const newGrid = [...gridState];
       newGrid[r][c] = anime;
       setGridState(newGrid);
-      setSelectedCell(null); // Bỏ chọn sau khi điền đúng
+      setSelectedCell(null);
     } else {
-      alert("Sai rồi! Bộ này không thỏa mãn cả 2 điều kiện.");
+      alert(json.message);
       setLives((prev) => prev - 1);
     }
   };
-
-  // --- RENDERING ---
 
   if (loading)
     return (
       <div className="min-vh-100 d-flex flex-column justify-content-center align-items-center bg-light">
         <div className="spinner-border text-primary mb-3" role="status"></div>
-        <h5 className="text-muted">Đang tạo bảng đấu...</h5>
+        <h5 className="text-muted fw-bold tracking-tight">
+          Đang tải dữ liệu H-Anime...
+        </h5>
       </div>
     );
-
-  if (!board) {
-    return (
-      <div className="min-vh-100 d-flex flex-column justify-content-center align-items-center bg-light p-3">
-        <div
-          className="bg-white p-5 rounded-4 shadow text-center animate-in zoom-in border border-light"
-          style={{ maxWidth: "450px" }}
-        >
-          {/* Icon minh họa */}
-          <div className="mb-4">
-            <div
-              className="d-inline-flex justify-content-center align-items-center bg-warning bg-opacity-10 rounded-circle"
-              style={{ width: "80px", height: "80px" }}
-            >
-              <span className="display-4">🧩</span>
-            </div>
-          </div>
-
-          <h3 className="fw-bold text-dark mb-3">Không thể tạo bảng đấu</h3>
-
-          <p className="text-muted mb-4">
-            Hệ thống không tìm thấy đề bài phù hợp hoặc đã có lỗi xảy ra. Đừng
-            lo, hãy thử tạo lại một ván mới nhé!
-          </p>
-
-          <div className="d-flex justify-content-center gap-3">
-            <Link
-              href="/game"
-              className="btn btn-outline-secondary rounded-pill px-4 py-2 fw-bold"
-            >
-              Thoát
-            </Link>
-            <button
-              className="btn btn-primary rounded-pill px-4 py-2 fw-bold shadow-sm hover-scale"
-              onClick={() => window.location.reload()}
-            >
-              Tạo lại ngay
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-vh-100 bg-light pb-5">
-      {/* --- HEADER NAVIGATION --- */}
-      <nav className="navbar navbar-expand-lg navbar-light bg-white shadow-sm sticky-top">
+      <nav className="navbar navbar-light bg-white shadow-sm sticky-top mb-4">
         <div className="container">
+          <Link
+            href="/game"
+            className="btn btn-sm btn-outline-secondary rounded-pill px-3 fw-bold"
+          >
+            &larr; Back
+          </Link>
           <div className="d-flex align-items-center gap-3">
-            <Link
-              href="/game"
-              className="btn btn-outline-secondary rounded-pill px-3 fw-bold btn-sm"
-            >
-              <i className="bi bi-arrow-left"></i> Back
-            </Link>
-            <span className="navbar-brand mb-0 h1 fw-bold text-primary d-none d-sm-block">
-              HenToHen
-            </span>
-          </div>
-
-          <div className="d-flex align-items-center gap-3">
-            <div className="d-flex align-items-center bg-danger bg-opacity-10 text-danger px-3 py-1 rounded-pill fw-bold border border-danger border-opacity-25">
-              ❤️ {lives}
+            <div className="badge bg-danger bg-opacity-10 text-danger border border-danger px-3 py-2 rounded-pill font-monospace">
+              LIVES: {lives}
             </div>
             <button
               className="btn btn-sm btn-primary rounded-pill px-3 fw-bold shadow-sm"
@@ -138,155 +146,133 @@ export default function TicTacToePage() {
         </div>
       </nav>
 
-      <div className="container d-flex flex-column align-items-center pt-4 animate-in fade-in">
-        {/* --- KHU VỰC TÌM KIẾM (ĐẶT Ở ĐÂY) --- */}
+      <div style={styles.wrapper}>
+        {/* --- SEARCH AREA (Responsive) --- */}
         <div
-          className="w-100 mb-4 sticky-md-top"
-          style={{ maxWidth: "600px", zIndex: 100 }}
+          className="w-100 mb-4 sticky-top"
+          style={{ maxWidth: "600px", top: "75px", zIndex: 100 }}
         >
-          <div className="bg-white p-3 rounded-4 shadow-sm border">
+          <div className="bg-white p-3 rounded-4 shadow-lg border mx-2">
             {selectedCell ? (
-              <div className="mb-2 text-center animate-in slide-in-from-top">
+              <div className="mb-2 text-center animate-in fade-in">
                 <small
-                  className="text-muted text-uppercase fw-bold"
-                  style={{ fontSize: "0.7rem" }}
+                  className="text-muted fw-bold"
+                  style={{ fontSize: "0.65rem" }}
                 >
-                  Đang tìm cho ô:
+                  Mục tiêu:
                 </small>
-                <div className="d-flex justify-content-center align-items-center gap-2 mt-1">
-                  <span className="badge bg-success bg-opacity-10 text-success border border-success px-2">
+                <div className="d-flex justify-content-center align-items-center gap-1 mt-1">
+                  <span className="badge bg-success truncate-text">
                     {board.rows[selectedCell.r].value}
                   </span>
                   <span className="text-muted">+</span>
-                  <span className="badge bg-primary bg-opacity-10 text-primary border border-primary px-2">
+                  <span className="badge bg-primary truncate-text">
                     {board.cols[selectedCell.c].value}
                   </span>
                 </div>
               </div>
             ) : (
-              <div className="text-center mb-2 text-muted fst-italic">
-                <small>Hãy bấm vào một ô trống bên dưới để bắt đầu đoán</small>
-              </div>
+              <p className="text-center mb-1 text-muted small fst-italic">
+                Bấm chọn ô trống bên dưới
+              </p>
             )}
-
-            {/* Search Bar luôn hiển thị, nhưng disable nếu chưa chọn ô */}
-            <div
-              className={!selectedCell ? "opacity-50 pointer-events-none" : ""}
-            >
+            <div style={{ opacity: selectedCell ? 1 : 0.4 }}>
               <GameSearch onGuess={handleGuess} disabled={!selectedCell} />
             </div>
           </div>
         </div>
 
-        {/* --- MAIN GAME BOARD --- */}
-        <div className="overflow-auto p-2" style={{ maxWidth: "100%" }}>
-          <div
-            className="d-flex flex-column gap-2"
-            style={{ minWidth: "340px" }}
-          >
-            {/* 1. Hàng Tiêu đề Cột */}
-            <div className="d-flex gap-2">
-              <div style={{ width: 100, height: 100 }}></div>
-              {board?.cols?.map((col, i) => (
-                <div
-                  key={i}
-                  className="d-flex flex-column justify-content-center align-items-center bg-white text-center p-2 rounded-3 shadow-sm border border-primary border-opacity-25 text-primary"
-                  style={{ width: 100, height: 100 }}
+        {/* --- MAIN GAME BOARD (Sử dụng clamp để res) --- */}
+        <div style={styles.container}>
+          {/* Header Row */}
+          <div style={styles.row}>
+            <div style={styles.cellBase}></div>
+            {board?.cols?.map((col, i) => (
+              <div
+                key={i}
+                style={{ ...styles.cellBase, ...styles.headerCell(false) }}
+              >
+                <b
+                  className="text-primary text-uppercase"
+                  style={{ fontSize: "0.55rem", opacity: 0.6 }}
                 >
-                  <small
-                    className="text-uppercase fw-bold opacity-50"
-                    style={{ fontSize: "0.65rem" }}
-                  >
-                    {col.type}
-                  </small>
-                  <span
-                    className="fw-bold text-truncate w-100"
-                    style={{ fontSize: "0.8rem" }}
-                  >
-                    {col.value}
-                  </span>
+                  {col.type}
+                </b>
+                <div className="fw-bold mt-1 line-clamp-2 px-1">
+                  {col.value}
                 </div>
-              ))}
-            </div>
-
-            {/* 2. Các Hàng Dữ Liệu */}
-            {board?.rows?.map((row, r) => (
-              <div key={r} className="d-flex gap-2">
-                {/* Tiêu đề Hàng */}
-                <div
-                  className="d-flex flex-column justify-content-center align-items-center bg-white text-center p-2 rounded-3 shadow-sm border border-success border-opacity-25 text-success"
-                  style={{ width: 100, height: 100 }}
-                >
-                  <small
-                    className="text-uppercase fw-bold opacity-50"
-                    style={{ fontSize: "0.65rem" }}
-                  >
-                    {row.type}
-                  </small>
-                  <span
-                    className="fw-bold text-truncate w-100"
-                    style={{ fontSize: "0.8rem" }}
-                  >
-                    {row.value}
-                  </span>
-                </div>
-
-                {/* 3 Ô GAME PLAY */}
-                {gridState[r].map((cellData, c) => {
-                  // Kiểm tra xem ô này có đang được chọn không
-                  const isSelected =
-                    selectedCell?.r === r && selectedCell?.c === c;
-
-                  return (
-                    <div
-                      key={c}
-                      onClick={() => !cellData && setSelectedCell({ r, c })}
-                      className={`
-                        position-relative rounded-3 d-flex justify-content-center align-items-center transition-all
-                        ${
-                          cellData
-                            ? "bg-white border-0 shadow-sm"
-                            : "bg-white cursor-pointer"
-                        }
-                        ${isSelected ? "ring-active shadow-lg" : "hover-scale"}
-                      `}
-                      style={{
-                        width: 100,
-                        height: 100,
-                        // Nếu đang chọn thì viền đậm màu cam, nếu không thì viền nét đứt
-                        border: isSelected
-                          ? "3px solid #fd7e14"
-                          : cellData
-                          ? "none"
-                          : "2px dashed #dee2e6",
-                        transform: isSelected ? "scale(1.05)" : "scale(1)",
-                        zIndex: isSelected ? 10 : 1,
-                      }}
-                    >
-                      {cellData ? (
-                        <img
-                          src={cellData.thumbnail}
-                          alt=""
-                          className="w-100 h-100 object-fit-cover rounded-3"
-                        />
-                      ) : isSelected ? (
-                        <div
-                          className="spinner-grow spinner-grow-sm text-warning"
-                          role="status"
-                        ></div>
-                      ) : (
-                        <span className="text-secondary opacity-25 display-6 fw-light">
-                          +
-                        </span>
-                      )}
-                    </div>
-                  );
-                })}
               </div>
             ))}
           </div>
+
+          {/* Data Rows */}
+          {board?.rows?.map((row, r) => (
+            <div key={r} style={styles.row}>
+              <div style={{ ...styles.cellBase, ...styles.headerCell(true) }}>
+                <b
+                  className="text-success text-uppercase"
+                  style={{ fontSize: "0.55rem", opacity: 0.6 }}
+                >
+                  {row.type}
+                </b>
+                <div className="fw-bold mt-1 line-clamp-2 px-1">
+                  {row.value}
+                </div>
+              </div>
+
+              {gridState[r].map((cellData, c) => {
+                const isSelected =
+                  selectedCell?.r === r && selectedCell?.c === c;
+                return (
+                  <div
+                    key={c}
+                    onClick={() => !cellData && setSelectedCell({ r, c })}
+                    style={{
+                      ...styles.cellBase,
+                      ...styles.playableCell(isSelected, !!cellData),
+                    }}
+                  >
+                    {cellData ? (
+                      <img
+                        src={cellData.thumbnail}
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover",
+                        }}
+                        alt="poster"
+                      />
+                    ) : isSelected ? (
+                      <div
+                        className="spinner-border text-warning border-3"
+                        style={{ width: "30%", height: "30%" }}
+                      />
+                    ) : (
+                      <span className="opacity-25" style={{ fontSize: "2rem" }}>
+                        +
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ))}
         </div>
       </div>
+
+      <style jsx>{`
+        .truncate-text {
+          max-width: 100px;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        @media (max-width: 576px) {
+          .truncate-text {
+            max-width: 70px;
+          }
+        }
+      `}</style>
     </div>
   );
 }

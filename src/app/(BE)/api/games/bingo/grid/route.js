@@ -67,12 +67,21 @@ export async function GET() {
           cell = { type: "year_lt", label: `Trước năm ${y}`, value: y };
         }
       } else if (type === "view") {
-        const kView = randomInt(1, 15) * 100; // 100k -> 1500k
-        cell = {
-          type: "views_gt",
-          label: `View > ${kView}K`,
-          value: kView * 1000,
-        };
+        const subType = randomItem(["gt", "lt"]);
+        const kView = randomInt(1, 50) * 100; // 100k -> 5000k
+        if (subType === "gt") {
+          cell = {
+            type: "views_gt",
+            label: `View > ${kView}K`,
+            value: kView * 1000,
+          };
+        } else {
+          cell = {
+            type: "views_lt",
+            label: `View < ${kView}K`,
+            value: kView * 1000,
+          };
+        }
       } else if (type === "meta") {
         const subType = randomItem(["censored", "uncensored", "2d", "3d"]);
         if (subType === "censored")

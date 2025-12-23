@@ -1,76 +1,53 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
-
-// Hàm check logic tại Client
-const checkCondition = (anime, cell) => {
-  if (!anime) return false;
-  const val = cell.value;
-  switch (cell.type) {
-    case "year_eq":
-      return parseInt(anime.releaseYear?.name) === val;
-    case "year_gt":
-      return parseInt(anime.releaseYear?.name) > val;
-    case "year_lt":
-      return parseInt(anime.releaseYear?.name) < val;
-    case "views_gt":
-      return (anime.views || 0) > val;
-    case "genre":
-      return anime.genres?.some((g) => g.name === val);
-    case "studio":
-      return anime.studios?.some((s) => s.name === val);
-    case "censorship":
-      return anime.censorship === val;
-    case "category":
-      return anime.category === val;
-    default:
-      return false;
-  }
-};
-
-// Logic check Bingo (Giữ nguyên)
-const WIN_PATTERNS = [
-  [0, 1, 2, 3],
-  [4, 5, 6, 7],
-  [8, 9, 10, 11],
-  [12, 13, 14, 15],
-  [0, 4, 8, 12],
-  [1, 5, 9, 13],
-  [2, 6, 10, 14],
-  [3, 7, 11, 15],
-  [0, 5, 10, 15],
-  [3, 6, 9, 12],
-];
 
 export default function BingoGamePage() {
   const [grid, setGrid] = useState([]);
-  const [deck, setDeck] = useState([]); // Bộ bài 50 lá
-  const [currentIndex, setCurrentIndex] = useState(0); // Lá bài hiện tại
-
+  const [deck, setDeck] = useState([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
   const [selectedCells, setSelectedCells] = useState([]);
   const [bingoLines, setBingoLines] = useState([]);
-  const [lives, setLives] = useState(3);
+  const [lives, setLives] = useState(10);
   const [loading, setLoading] = useState(true);
-  const [gameStatus, setGameStatus] = useState("playing"); // playing, won, lost
+  const [gameStatus, setGameStatus] = useState("setup"); // setup, playing, won, lost
 
-  const initGame = async () => {
+  // --- NEW STATES ---
+  const [targetBingoGoal, setTargetBingoGoal] = useState(1); // Mục tiêu: 1, 2, 3 đường
+  const [hintsLeft, setHintsLeft] = useState(3);
+  const [activeHintIds, setActiveHintIds] = useState([]); // Chứa 4 ID ô đang được gợi ý
+
+  const WIN_PATTERNS = [
+    [0, 1, 2, 3],
+    [4, 5, 6, 7],
+    [8, 9, 10, 11],
+    [12, 13, 14, 15],
+    [0, 4, 8, 12],
+    [1, 5, 9, 13],
+    [2, 6, 10, 14],
+    [3, 7, 11, 15],
+    [0, 5, 10, 15],
+    [3, 6, 9, 12],
+  ];
+
+  const initGame = async (goal) => {
     setLoading(true);
-    setLives(3);
+    setTargetBingoGoal(goal);
+    setLives(10);
+    setHintsLeft(3);
     setSelectedCells([]);
     setBingoLines([]);
     setCurrentIndex(0);
+    setActiveHintIds([]);
     setGameStatus("playing");
 
     try {
-      // B1: Lấy Grid 16 ô
       const gridRes = await fetch("/api/games/bingo/grid");
       const gridData = await gridRes.json();
 
       if (gridData.success) {
         setGrid(gridData.grid);
-
-        // B2: Lấy bộ bài 50 lá dựa trên Grid vừa tạo
         const deckRes = await fetch("/api/games/bingo/deck", {
           method: "POST",
           body: JSON.stringify({ grid: gridData.grid }),
@@ -88,57 +65,119 @@ export default function BingoGamePage() {
     }
   };
 
-  useEffect(() => {
-    initGame();
-  }, []);
+  // --- LOGIC GỢI Ý ---
+  const handleUseHint = () => {
+    if (hintsLeft <= 0 || gameStatus !== "playing") return;
 
-  // Xử lý khi bấm vào ô
+    const currentAnime = deck[currentIndex];
+    const correctIds = currentAnime.matchedCellIds || [];
+
+    // Lọc ra các ô đúng mà người dùng chưa chọn
+    const availableCorrectIds = correctIds.filter(
+      (id) => !selectedCells.includes(id)
+    );
+
+    if (availableCorrectIds.length === 0) {
+      alert("Lá bài này không khớp với ô trống nào trên bảng!");
+      return;
+    }
+
+    // 1. Lấy 1 ô đúng ngẫu nhiên
+    const oneCorrect =
+      availableCorrectIds[
+        Math.floor(Math.random() * availableCorrectIds.length)
+      ];
+
+    // 2. Lấy 3 ô sai ngẫu nhiên
+    const allIds = Array.from({ length: 16 }, (_, i) => i);
+    const wrongIds = allIds.filter((id) => !correctIds.includes(id));
+    const threeWrongs = [];
+    for (let i = 0; i < 3; i++) {
+      if (wrongIds.length > 0) {
+        const idx = Math.floor(Math.random() * wrongIds.length);
+        threeWrongs.push(wrongIds.splice(idx, 1)[0]);
+      }
+    }
+
+    // Trộn 4 ô này lại để người dùng không biết cái nào là cái nào
+    const hintBatch = [oneCorrect, ...threeWrongs].sort(
+      () => Math.random() - 0.5
+    );
+    setActiveHintIds(hintBatch);
+    setHintsLeft((prev) => prev - 1);
+  };
+
   const handleCellClick = (cell) => {
     if (gameStatus !== "playing" || selectedCells.includes(cell.id)) return;
 
     const currentAnime = deck[currentIndex];
-    const isCorrect = checkCondition(currentAnime, cell);
+    // Sử dụng matchedCellIds truyền từ BE để check cho nhanh và chuẩn
+    const isCorrect = currentAnime.matchedCellIds?.includes(cell.id);
 
     if (isCorrect) {
-      // Đúng -> Chọn ô -> Check Bingo
       const newSelected = [...selectedCells, cell.id];
       setSelectedCells(newSelected);
       checkBingo(newSelected);
-      nextCard(); // Chuyển bài
+      setActiveHintIds([]); // Reset gợi ý khi đã chọn
+      nextCard();
     } else {
-      // Sai -> Trừ mạng -> Chuyển bài
       const newLives = lives - 1;
       setLives(newLives);
       if (newLives <= 0) setGameStatus("lost");
+      setActiveHintIds([]);
       nextCard();
     }
   };
 
-  // Nút bỏ qua (Skip)
   const nextCard = () => {
     if (currentIndex < deck.length - 1) {
       setCurrentIndex((prev) => prev + 1);
     } else {
-      // Hết bài mà chưa Bingo -> Thua? Hoặc random thêm?
-      // Ở đây tôi cho là Thua nếu hết bài
-      if (bingoLines.length === 0) setGameStatus("lost");
+      if (bingoLines.length < targetBingoGoal) setGameStatus("lost");
     }
   };
 
   const checkBingo = (currentSelected) => {
-    const newBingos = [];
+    const newLines = [];
     WIN_PATTERNS.forEach((pattern, index) => {
       if (pattern.every((id) => currentSelected.includes(id))) {
-        if (!bingoLines.includes(index)) newBingos.push(index);
+        if (!bingoLines.includes(index)) newLines.push(index);
       }
     });
-    if (newBingos.length > 0) {
-      setBingoLines([...bingoLines, ...newBingos]);
-      // setGameStatus("won"); // Tùy bạn muốn 1 dòng là thắng hay chơi tiếp
+
+    if (newLines.length > 0) {
+      const totalLines = [...bingoLines, ...newLines];
+      setBingoLines(totalLines);
+      if (totalLines.length >= targetBingoGoal) {
+        setGameStatus("won");
+      }
     }
   };
 
-  const currentAnime = deck[currentIndex];
+  // --- UI COMPONENTS ---
+
+  if (gameStatus === "setup") {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-100 p-4">
+        <div className="bg-white p-8 rounded-2xl shadow-xl text-center max-w-sm w-full border">
+          <h2 className="text-2xl font-bold mb-6 text-blue-600">
+            Chọn Mục Tiêu Bingo
+          </h2>
+          <div className="grid gap-3">
+            {[1, 2, 3].map((num) => (
+              <button
+                key={num}
+                onClick={() => initGame(num)}
+                className="btn btn-outline-primary btn-lg rounded-pill fw-bold py-3 hover-scale"
+              >
+                Hoàn thành {num} đường Bingo
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (loading)
     return (
@@ -150,86 +189,145 @@ export default function BingoGamePage() {
   return (
     <div className="min-h-screen bg-slate-50 pb-20">
       {/* HEADER */}
-      <div className="bg-white shadow-sm sticky top-0 z-40 border-b p-3 mb-6 flex justify-between items-center max-w-4xl mx-auto">
-        <Link href="/game" className="btn btn-sm btn-outline-secondary">
-          Back
-        </Link>
-        <h1 className="font-bold text-blue-600">ANIME BINGO</h1>
-        <div className="flex gap-2">
-          <span>Cards: {50 - currentIndex}</span>
-          <span>❤️ {lives}</span>
+      <div className="bg-white shadow-sm sticky top-0 z-40 border-b p-3 mb-6 flex justify-between items-center max-w-6xl mx-auto">
+        <div className="flex items-center gap-4">
+          <Link
+            href="/game"
+            className="btn btn-sm btn-outline-secondary rounded-pill px-3"
+          >
+            Back
+          </Link>
+          <div className="badge bg-primary bg-opacity-10 text-primary border border-primary px-3 py-2 rounded-pill font-bold">
+            Goal: {targetBingoGoal} Lines
+          </div>
+        </div>
+
+        <h1 className="font-black text-blue-600 text-xl tracking-tighter hidden md:block">
+          ANIME BINGO
+        </h1>
+
+        <div className="flex items-center gap-4">
+          <div className="text-sm font-bold text-slate-500">
+            Card: <span className="text-dark">{currentIndex + 1}/50</span>
+          </div>
+          <div className="badge bg-danger px-3 py-2 rounded-pill fs-6 shadow-sm">
+            ❤️ {lives}
+          </div>
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto px-4 grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
-        {/* LEFT: CURRENT CARD (DECK) */}
-        <div className="flex flex-col items-center">
-          {currentAnime && gameStatus === "playing" ? (
-            <div className="bg-white p-4 rounded-xl shadow-lg border w-full max-w-sm text-center relative">
-              <div className="absolute top-2 right-2 bg-slate-100 text-xs px-2 py-1 rounded-full font-bold">
-                #{currentIndex + 1}/50
-              </div>
+      <div className="max-w-6xl mx-auto px-4 grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
+        {/* LEFT: DECK */}
+        <div
+          className="flex flex-col items-center sticky-md-top"
+          style={{ top: "80px" }}
+        >
+          {gameStatus === "playing" ? (
+            <div className="bg-white p-6 rounded-2xl shadow-lg border w-full max-w-md text-center transition-all">
               <img
-                src={currentAnime.thumbnail}
-                className="w-40 h-56 object-cover rounded-lg mx-auto mb-3 shadow-md"
+                src={deck[currentIndex]?.thumbnail}
+                className="w-48 h-64 object-cover rounded-xl mx-auto mb-4 shadow-md border"
                 alt="cover"
               />
-              <h3 className="font-bold text-lg line-clamp-2 mb-2">
-                {currentAnime.title}
+              <h3 className="font-bold text-xl mb-4 line-clamp-1">
+                {deck[currentIndex]?.title}
               </h3>
 
-              {/* Nút Skip */}
-              <button
-                onClick={nextCard}
-                className="btn btn-secondary w-full rounded-pill fw-bold"
-              >
-                Skip / Bỏ qua ⏭️
-              </button>
-              <p className="text-xs text-slate-400 mt-2">
-                Bấm vào ô bên phải nếu trùng khớp
-              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={nextCard}
+                  className="btn btn-light rounded-pill fw-bold border text-muted py-2"
+                >
+                  Bỏ qua (Skip)
+                </button>
+                <button
+                  onClick={handleUseHint}
+                  disabled={hintsLeft <= 0}
+                  className={`btn rounded-pill fw-bold py-2 ${
+                    hintsLeft > 0
+                      ? "btn-warning shadow"
+                      : "btn-light text-muted"
+                  }`}
+                >
+                  💡 Gợi ý ({hintsLeft})
+                </button>
+              </div>
             </div>
           ) : (
-            <div className="text-center p-10">
-              {gameStatus === "lost" && (
-                <h2 className="text-red-500 font-bold text-2xl">GAME OVER</h2>
-              )}
-              <button onClick={initGame} className="btn btn-primary mt-4">
-                Chơi lại
+            <div className="bg-white p-8 rounded-2xl shadow-lg border text-center w-full max-w-md animate-in zoom-in">
+              <div
+                className={`display-1 mb-4 ${
+                  gameStatus === "won" ? "text-success" : "text-danger"
+                }`}
+              >
+                {gameStatus === "won" ? "🏆" : "💀"}
+              </div>
+              <h2
+                className={`font-bold text-3xl mb-2 ${
+                  gameStatus === "won" ? "text-success" : "text-danger"
+                }`}
+              >
+                {gameStatus === "won" ? "BINGO MASTER!" : "GAME OVER"}
+              </h2>
+              <p className="text-muted mb-6">
+                Bạn đã đạt {bingoLines.length}/{targetBingoGoal} đường Bingo.
+              </p>
+              <button
+                onClick={() => setGameStatus("setup")}
+                className="btn btn-primary btn-lg px-5 rounded-pill shadow-lg"
+              >
+                Chơi ván mới
               </button>
             </div>
           )}
         </div>
 
-        {/* RIGHT: BINGO GRID */}
+        {/* RIGHT: GRID */}
         <div>
-          {bingoLines.length > 0 && (
-            <div className="mb-4 bg-yellow-100 text-yellow-800 p-2 rounded text-center font-bold animate-bounce">
-              🎉 BINGO! ({bingoLines.length} lines)
+          <div className="flex justify-between items-end mb-4">
+            <h5 className="font-bold text-slate-700 mb-0">Bảng Bingo 4x4</h5>
+            <div className="text-sm text-blue-600 font-bold">
+              Đã đạt: {bingoLines.length} / {targetBingoGoal} lines
             </div>
-          )}
+          </div>
 
           <div className="grid grid-cols-4 gap-2 aspect-square">
             {grid.map((cell) => {
               const isSelected = selectedCells.includes(cell.id);
+              const isHinted = activeHintIds.includes(cell.id);
+
               return (
                 <button
                   key={cell.id}
                   onClick={() => handleCellClick(cell)}
                   disabled={isSelected || gameStatus !== "playing"}
                   className={`
-                                p-1 rounded-lg border-2 shadow-sm flex flex-col items-center justify-center text-center text-xs font-bold transition-all
-                                ${
-                                  isSelected
-                                    ? "bg-green-500 text-white border-green-600"
-                                    : "bg-white hover:bg-blue-50 text-slate-600"
-                                }
-                            `}
+                    p-1 rounded-xl border-2 shadow-sm flex flex-col items-center justify-center text-center text-xs font-bold transition-all h-full
+                    ${
+                      isSelected
+                        ? "bg-green-500 text-white border-green-600 scale-95 shadow-none"
+                        : "bg-white hover:bg-blue-50 text-slate-600"
+                    }
+                    ${
+                      isHinted && !isSelected
+                        ? "border-warning border-4 animate-pulse ring ring-warning ring-opacity-20"
+                        : "border-slate-100"
+                    }
+                  `}
                 >
-                  <span className="mb-1 opacity-70 text-[10px]">
-                    {cell.type}
+                  <span
+                    className={`mb-1 opacity-50 text-[9px] uppercase tracking-tighter ${
+                      isSelected ? "text-white" : ""
+                    }`}
+                  >
+                    {cell.type.replace("_", " ")}
                   </span>
-                  {cell.label}
+                  <div className="line-clamp-3">{cell.label}</div>
+                  {isHinted && !isSelected && (
+                    <div className="text-[8px] mt-1 bg-warning text-dark px-1 rounded">
+                      HINT
+                    </div>
+                  )}
                 </button>
               );
             })}
