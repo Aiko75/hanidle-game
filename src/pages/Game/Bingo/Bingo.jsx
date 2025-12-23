@@ -9,7 +9,7 @@ export default function BingoGamePage() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selectedCells, setSelectedCells] = useState([]);
   const [bingoLines, setBingoLines] = useState([]);
-  const [lives, setLives] = useState(10);
+  const [lives, setLives] = useState(0);
   const [loading, setLoading] = useState(true);
   const [gameStatus, setGameStatus] = useState("setup"); // setup, playing, won, lost
 
@@ -17,6 +17,33 @@ export default function BingoGamePage() {
   const [targetBingoGoal, setTargetBingoGoal] = useState(1); // Mục tiêu: 1, 2, 3 đường
   const [hintsLeft, setHintsLeft] = useState(3);
   const [activeHintIds, setActiveHintIds] = useState([]); // Chứa 4 ID ô đang được gợi ý
+
+  const checkCondition = (anime, cell) => {
+    if (!anime) return false;
+    const val = cell.value;
+    switch (cell.type) {
+      case "year_eq":
+        return parseInt(anime.releaseYear?.name) === val;
+      case "year_gt":
+        return parseInt(anime.releaseYear?.name) > val;
+      case "year_lt":
+        return parseInt(anime.releaseYear?.name) < val;
+      case "views_gt":
+        return (anime.views || 0) > val;
+      case "views_lt":
+        return (anime.views || 0) < val;
+      case "genre":
+        return anime.genres?.some((g) => g.name === val);
+      case "studio":
+        return anime.studios?.some((s) => s.name === val);
+      case "censorship":
+        return anime.censorship === val;
+      case "category":
+        return anime.category === val;
+      default:
+        return false;
+    }
+  };
 
   const WIN_PATTERNS = [
     [0, 1, 2, 3],
@@ -34,7 +61,7 @@ export default function BingoGamePage() {
   const initGame = async (goal) => {
     setLoading(true);
     setTargetBingoGoal(goal);
-    setLives(10);
+    setLives(goal + 2);
     setHintsLeft(3);
     setSelectedCells([]);
     setBingoLines([]);
@@ -50,7 +77,7 @@ export default function BingoGamePage() {
         setGrid(gridData.grid);
         const deckRes = await fetch("/api/games/bingo/deck", {
           method: "POST",
-          body: JSON.stringify({ grid: gridData.grid }),
+          body: JSON.stringify({ grid: gridData.grid, goal: goal }),
         });
         const deckData = await deckRes.json();
 
@@ -65,30 +92,41 @@ export default function BingoGamePage() {
     }
   };
 
-  // --- LOGIC GỢI Ý ---
+  // --- LOGIC GỢI Ý ĐÃ CẬP NHẬT ---
   const handleUseHint = () => {
     if (hintsLeft <= 0 || gameStatus !== "playing") return;
 
     const currentAnime = deck[currentIndex];
-    const correctIds = currentAnime.matchedCellIds || [];
 
-    // Lọc ra các ô đúng mà người dùng chưa chọn
+    // Bước 1: Xác định tất cả các Cell ID đúng dựa trên logic 2 lớp
+    const correctIds = grid
+      .filter((cell) => {
+        let isMatch = checkCondition(currentAnime, cell);
+        if (!isMatch) {
+          isMatch = currentAnime.matchedCellIds?.includes(cell.id);
+        }
+        return isMatch;
+      })
+      .map((cell) => cell.id);
+
+    // Bước 2: Lọc ra các ô đúng mà người dùng chưa chọn
     const availableCorrectIds = correctIds.filter(
       (id) => !selectedCells.includes(id)
     );
 
     if (availableCorrectIds.length === 0) {
       alert("Lá bài này không khớp với ô trống nào trên bảng!");
+      setHintsLeft((prev) => prev - 1);
       return;
     }
 
-    // 1. Lấy 1 ô đúng ngẫu nhiên
+    // Bước 3: Lấy 1 ô đúng ngẫu nhiên từ danh sách đã xác định ở Bước 1
     const oneCorrect =
       availableCorrectIds[
         Math.floor(Math.random() * availableCorrectIds.length)
       ];
 
-    // 2. Lấy 3 ô sai ngẫu nhiên
+    // Bước 4: Xác định các ô sai (không nằm trong danh sách correctIds)
     const allIds = Array.from({ length: 16 }, (_, i) => i);
     const wrongIds = allIds.filter((id) => !correctIds.includes(id));
     const threeWrongs = [];
@@ -99,7 +137,7 @@ export default function BingoGamePage() {
       }
     }
 
-    // Trộn 4 ô này lại để người dùng không biết cái nào là cái nào
+    // Bước 5: Trộn và hiển thị
     const hintBatch = [oneCorrect, ...threeWrongs].sort(
       () => Math.random() - 0.5
     );
@@ -111,8 +149,10 @@ export default function BingoGamePage() {
     if (gameStatus !== "playing" || selectedCells.includes(cell.id)) return;
 
     const currentAnime = deck[currentIndex];
-    // Sử dụng matchedCellIds truyền từ BE để check cho nhanh và chuẩn
-    const isCorrect = currentAnime.matchedCellIds?.includes(cell.id);
+    let isCorrect = checkCondition(currentAnime, cell);
+    if (!isCorrect) {
+      isCorrect = currentAnime.matchedCellIds?.includes(cell.id);
+    }
 
     if (isCorrect) {
       const newSelected = [...selectedCells, cell.id];
@@ -158,9 +198,9 @@ export default function BingoGamePage() {
 
   if (gameStatus === "setup") {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-100 p-4">
-        <div className="bg-white p-8 rounded-2xl shadow-xl text-center max-w-sm w-full border">
-          <h2 className="text-2xl font-bold mb-6 text-blue-600">
+      <div className="flex items-center justify-center min-h-screen p-4 bg-slate-100">
+        <div className="w-full max-w-sm p-8 text-center bg-white border shadow-xl rounded-2xl">
+          <h2 className="mb-6 text-2xl font-bold text-blue-600">
             Chọn Mục Tiêu Bingo
           </h2>
           <div className="grid gap-3">
@@ -168,7 +208,7 @@ export default function BingoGamePage() {
               <button
                 key={num}
                 onClick={() => initGame(num)}
-                className="btn btn-outline-primary btn-lg rounded-pill fw-bold py-3 hover-scale"
+                className="py-3 btn btn-outline-primary btn-lg rounded-pill fw-bold hover-scale"
               >
                 Hoàn thành {num} đường Bingo
               </button>
@@ -181,62 +221,65 @@ export default function BingoGamePage() {
 
   if (loading)
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+      <div className="flex items-center justify-center min-h-screen bg-slate-50">
         <div className="spinner-border text-primary"></div>
       </div>
     );
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-20">
+    <div className="min-h-screen pb-20 bg-slate-50">
       {/* HEADER */}
-      <div className="bg-white shadow-sm sticky top-0 z-40 border-b p-3 mb-6 flex justify-between items-center max-w-6xl mx-auto">
+      <div className="sticky top-0 z-40 flex items-center justify-between max-w-6xl p-3 mx-auto mb-6 bg-white border-b shadow-sm">
         <div className="flex items-center gap-4">
           <Link
             href="/game"
-            className="btn btn-sm btn-outline-secondary rounded-pill px-3"
+            className="px-3 btn btn-sm btn-outline-secondary rounded-pill"
           >
             Back
           </Link>
-          <div className="badge bg-primary bg-opacity-10 text-primary border border-primary px-3 py-2 rounded-pill font-bold">
-            Goal: {targetBingoGoal} Lines
+          <div className="px-3 py-2 font-bold border badge bg-primary bg-opacity-10 text-primary border-primary rounded-pill">
+            Goal: {targetBingoGoal} {targetBingoGoal > 1 ? "Lines" : "Line"}
           </div>
         </div>
 
-        <h1 className="font-black text-blue-600 text-xl tracking-tighter hidden md:block">
+        <h1 className="hidden text-xl font-black tracking-tighter text-blue-600 md:block">
           ANIME BINGO
         </h1>
 
         <div className="flex items-center gap-4">
           <div className="text-sm font-bold text-slate-500">
-            Card: <span className="text-dark">{currentIndex + 1}/50</span>
+            Card:{" "}
+            <span className="text-dark">
+              {currentIndex + 1}/{deck.length}
+            </span>
           </div>
-          <div className="badge bg-danger px-3 py-2 rounded-pill fs-6 shadow-sm">
+          <div className="px-3 py-2 shadow-sm badge bg-danger rounded-pill fs-6">
             ❤️ {lives}
           </div>
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-4 grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
+      <div className="grid items-start max-w-6xl grid-cols-1 gap-8 px-4 mx-auto md:grid-cols-2">
         {/* LEFT: DECK */}
         <div
           className="flex flex-col items-center sticky-md-top"
           style={{ top: "80px" }}
         >
           {gameStatus === "playing" ? (
-            <div className="bg-white p-6 rounded-2xl shadow-lg border w-full max-w-md text-center transition-all">
+            <div className="w-full max-w-md p-6 text-center transition-all bg-white border shadow-lg rounded-2xl">
               <img
                 src={deck[currentIndex]?.thumbnail}
-                className="w-48 h-64 object-cover rounded-xl mx-auto mb-4 shadow-md border"
+                className="object-cover w-48 h-64 mx-auto mb-4 border shadow-md rounded-xl"
                 alt="cover"
               />
-              <h3 className="font-bold text-xl mb-4 line-clamp-1">
+              <h3 className="mb-4 text-lg font-bold leading-tight wrap-break-words text-slate-800">
                 {deck[currentIndex]?.title}
               </h3>
 
               <div className="grid grid-cols-2 gap-3">
                 <button
                   onClick={nextCard}
-                  className="btn btn-light rounded-pill fw-bold border text-muted py-2"
+                  className="py-2 border btn btn-light rounded-pill fw-bold text-muted"
                 >
                   Bỏ qua (Skip)
                 </button>
@@ -254,7 +297,7 @@ export default function BingoGamePage() {
               </div>
             </div>
           ) : (
-            <div className="bg-white p-8 rounded-2xl shadow-lg border text-center w-full max-w-md animate-in zoom-in">
+            <div className="w-full max-w-md p-8 text-center bg-white border shadow-lg rounded-2xl animate-in zoom-in">
               <div
                 className={`display-1 mb-4 ${
                   gameStatus === "won" ? "text-success" : "text-danger"
@@ -269,12 +312,12 @@ export default function BingoGamePage() {
               >
                 {gameStatus === "won" ? "BINGO MASTER!" : "GAME OVER"}
               </h2>
-              <p className="text-muted mb-6">
+              <p className="mb-6 text-muted">
                 Bạn đã đạt {bingoLines.length}/{targetBingoGoal} đường Bingo.
               </p>
               <button
                 onClick={() => setGameStatus("setup")}
-                className="btn btn-primary btn-lg px-5 rounded-pill shadow-lg"
+                className="px-5 shadow-lg btn btn-primary btn-lg rounded-pill"
               >
                 Chơi ván mới
               </button>
@@ -284,9 +327,9 @@ export default function BingoGamePage() {
 
         {/* RIGHT: GRID */}
         <div>
-          <div className="flex justify-between items-end mb-4">
-            <h5 className="font-bold text-slate-700 mb-0">Bảng Bingo 4x4</h5>
-            <div className="text-sm text-blue-600 font-bold">
+          <div className="flex items-end justify-between mb-4">
+            <h5 className="mb-0 font-bold text-slate-700">Bảng Bingo 4x4</h5>
+            <div className="text-sm font-bold text-blue-600">
               Đã đạt: {bingoLines.length} / {targetBingoGoal} lines
             </div>
           </div>

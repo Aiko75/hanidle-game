@@ -30,13 +30,20 @@ const checkMatch = (anime, cell) => {
 
 export async function POST(request) {
   try {
-    const { grid } = await request.json();
+    // Nhận thêm tham số goal từ request
+    const { grid, goal } = await request.json();
+
+    // --- BƯỚC 0: TÍNH TOÁN SỐ LƯỢNG THEO GOAL ---
+    // 1 line -> 30 cards, 2 lines -> 40 cards, 3 lines -> 50 cards
+    const totalCards = goal === 1 ? 30 : goal === 2 ? 40 : 50;
+    const targetMatched = Math.floor(totalCards * 0.7); // Tỷ lệ 70% trúng (21, 28, 35)
+    const targetUnmatched = totalCards - targetMatched; // Tỷ lệ 30% trượt (9, 12, 15)
 
     const matchedAnimes = [];
     const unMatchedAnimes = [];
     const usedIds = new Set();
 
-    // Tạo bộ đếm tạm thời để giới hạn mỗi ô tối đa 3 card phù hợp
+    // Bộ đếm giới hạn mỗi ô tối đa 3 card phù hợp để dàn trải đáp án
     const tempDistributionCount = Array(16).fill(0);
 
     const shuffledRawData = [...animeData].sort(() => 0.5 - Math.random());
@@ -46,7 +53,7 @@ export async function POST(request) {
       const matchedIds = [];
       grid.forEach((cell) => {
         if (checkMatch(anime, cell)) {
-          // Chỉ tính là match nếu ô này chưa có quá 3 card trong danh sách matchedAnimes
+          // Chỉ tính là match nếu ô này chưa có quá 3 card
           if (tempDistributionCount[cell.id] < 3) {
             matchedIds.push(cell.id);
           }
@@ -54,25 +61,33 @@ export async function POST(request) {
       });
 
       if (matchedIds.length > 0 && matchedIds.length <= 3) {
-        if (matchedAnimes.length < 35) {
+        if (matchedAnimes.length < targetMatched) {
           matchedIds.forEach((id) => tempDistributionCount[id]++);
           matchedAnimes.push({ ...anime, matchedCellIds: matchedIds });
           usedIds.add(anime.id);
         }
-      } else if (matchedIds.length === 0 && unMatchedAnimes.length < 15) {
+      } else if (
+        matchedIds.length === 0 &&
+        unMatchedAnimes.length < targetUnmatched
+      ) {
         unMatchedAnimes.push({ ...anime, matchedCellIds: [] });
         usedIds.add(anime.id);
       }
 
-      if (matchedAnimes.length === 35 && unMatchedAnimes.length === 15) break;
+      // Thoát vòng lặp khi đã đủ số lượng mục tiêu theo goal
+      if (
+        matchedAnimes.length === targetMatched &&
+        unMatchedAnimes.length === targetUnmatched
+      )
+        break;
     }
 
-    // --- BƯỚC 2: BỐC BÙ NẾU CHƯA ĐỦ 50 CARD ---
+    // --- BƯỚC 2: BỐC BÙ NẾU CHƯA ĐỦ CARD THEO GOAL ---
     let currentDeck = [...matchedAnimes, ...unMatchedAnimes];
 
-    if (currentDeck.length < 50) {
+    if (currentDeck.length < totalCards) {
       for (const anime of shuffledRawData) {
-        if (currentDeck.length >= 50) break;
+        if (currentDeck.length >= totalCards) break;
         if (!usedIds.has(anime.id)) {
           const extraMatchedIds = [];
           grid.forEach((cell) => {
@@ -85,16 +100,13 @@ export async function POST(request) {
     }
 
     // --- BƯỚC 3: SHUFFLE CUỐI CÙNG VÀ TẠO DEBUG DISTRIBUTION ---
-    // Trộn bộ bài lần cuối
     const shuffledDeck = currentDeck.sort(() => 0.5 - Math.random());
 
-    // Khởi tạo object debug: { cellId: [vị trí index trong deck] }
     const debugDistribution = {};
     grid.forEach((cell) => {
       debugDistribution[cell.id] = [];
     });
 
-    // Duyệt qua deck đã trộn để lấy vị trí (index)
     shuffledDeck.forEach((card, index) => {
       if (card.matchedCellIds && card.matchedCellIds.length > 0) {
         card.matchedCellIds.forEach((cellId) => {
@@ -110,7 +122,7 @@ export async function POST(request) {
       debug_distribution: debugDistribution,
     });
   } catch (error) {
-    console.error(error);
+    console.error("Lỗi API Deck:", error);
     return NextResponse.json({ success: false }, { status: 500 });
   }
 }
