@@ -1,10 +1,12 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
 import GuessLog from "@/components/game/HenTexto/GuessLog";
 import GameSearch from "@/components/game/HenTexto/GameSearch";
 import AnimeCard from "@/components/list/AnimeCard";
+import { LOCAL_STORAGE_KEYS } from "@/app/constants/localKey";
+import { api } from "@/app/api/baseJsonApi";
 
 export default function HanidleGamePage() {
   const [guesses, setGuesses] = useState([]);
@@ -14,18 +16,67 @@ export default function HanidleGamePage() {
   const [lastGuess, setLastGuess] = useState(null);
   const [hintsUsed, setHintsUsed] = useState(0);
 
+  const isInitialized = useRef(false);
+  const STORAGE_KEY = LOCAL_STORAGE_KEYS.CONTEXTO.PROGRESS;
+
+  // --- 1. KHÔI PHỤC TIẾN TRÌNH (Mount) ---
   useEffect(() => {
-    fetch("/api/hanimes/random?limit=1")
-      .then((res) => res.json())
-      .then((res) => {
-        if (res.success) {
-          console.log("Secret ID:", res.data.id, res.data.title);
-          setSecretAnime(res.data);
-        }
-      })
-      .catch((err) => console.error("Lỗi khởi tạo game:", err));
+    const savedData = localStorage.getItem(STORAGE_KEY);
+
+    if (savedData) {
+      try {
+        const progress = JSON.parse(savedData);
+        setGuesses(progress.guesses || []);
+        setSecretAnime(progress.secretAnime || null);
+        setWinItem(progress.winItem || null);
+        setLastGuess(progress.lastGuess || null);
+        setHintsUsed(progress.hintsUsed || 0);
+        isInitialized.current = true;
+      } catch (e) {
+        console.error("❌ Lỗi phục hồi PROGRESS HenTexto:", e);
+        initNewGame();
+      }
+    } else {
+      initNewGame();
+    }
   }, []);
 
+  const initNewGame = async () => {
+    try {
+      const res = await api.get("/api/hanimes/random?limit=1");
+      if (res.success) {
+        setSecretAnime(res.data);
+        isInitialized.current = true;
+      }
+    } catch (err) {
+      // Error ở đây đã được catch từ request() của BaseJsonApi
+      console.error("Lỗi khởi tạo game:", err.message);
+    }
+  };
+
+  // --- 2. LƯU TIẾN TRÌNH TỰ ĐỘNG (Watcher) ---
+  useEffect(() => {
+    // Chỉ lưu khi đã khởi tạo xong và có anime bí mật
+    if (!isInitialized.current || !secretAnime) return;
+
+    const progressToSave = {
+      guesses,
+      secretAnime,
+      winItem,
+      lastGuess,
+      hintsUsed,
+    };
+
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(progressToSave));
+  }, [guesses, secretAnime, winItem, lastGuess, hintsUsed]);
+
+  // --- 3. RESET GAME ---
+  const handleResetGame = () => {
+    localStorage.removeItem(STORAGE_KEY);
+    window.location.reload();
+  };
+
+  // --- LOGIC GỢI Ý & ĐOÁN (Giữ nguyên) ---
   const hintLogic = useMemo(() => {
     const guessCount = guesses.length;
     let earned = 0;
@@ -54,10 +105,11 @@ export default function HanidleGamePage() {
           }))
         );
       }
-      if (secretAnime.release_year) {
+      if (secretAnime.releaseYear?.name) {
+        // Fix nhẹ path dữ liệu theo cấu trúc chuẩn của bạn
         revealList.push({
           type: "Year",
-          value: secretAnime.release_year,
+          value: secretAnime.releaseYear.name,
           color: "bg-secondary bg-opacity-10 text-secondary border-secondary",
         });
       }
@@ -77,32 +129,24 @@ export default function HanidleGamePage() {
   };
 
   const handleGuess = async (anime) => {
-    if (!secretAnime) return;
+    if (!secretAnime || winItem) return;
     if (guesses.some((g) => g.id === anime.id)) return;
 
     setLoading(true);
     try {
-      const res = await fetch("/api/games/hentexto/guess", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          guestId: anime.id,
-          secretId: secretAnime.id,
-        }),
-      });
-
-      const json = await res.json();
-
+      const json = await api.post(
+        "/api/games/hentexto/guess",
+        JSON.stringify({ guestId: anime.id, secretId: secretAnime.id }),
+        { "Content-Type": "application/json" }
+      );
       if (json.success) {
         const rank = json.rank;
         const newGuess = { ...anime, rank: rank };
         setLastGuess(newGuess);
-
-        const updatedGuesses = [newGuess, ...guesses];
-        // Sort danh sách chính theo Rank (gần nhất lên đầu)
-        updatedGuesses.sort((a, b) => a.rank - b.rank);
+        const updatedGuesses = [newGuess, ...guesses].sort(
+          (a, b) => a.rank - b.rank
+        );
         setGuesses(updatedGuesses);
-
         if (rank === 1) setWinItem(anime);
       }
     } catch (error) {
@@ -112,46 +156,49 @@ export default function HanidleGamePage() {
     }
   };
 
-  if (!secretAnime) {
+  if (!secretAnime)
     return (
       <div className="min-vh-100 d-flex flex-column justify-content-center align-items-center bg-light">
-        <div className="spinner-border text-primary mb-3" role="status"></div>
-        <h5 className="text-muted">Vui lòng chờ một chút, game đang lọ...</h5>
+        <div className="mb-3 spinner-border text-primary"></div>
+        <h5 className="text-muted fw-bold">Đang thiết lập dữ liệu bí mật...</h5>
       </div>
     );
-  }
 
   return (
-    <div className="min-vh-100 bg-light pb-5">
-      {/* --- HEADER NAVIGATION --- */}
-      <nav className="navbar navbar-expand-lg navbar-light bg-white shadow-sm sticky-top mb-4">
+    <div className="pb-5 min-vh-100 bg-light">
+      <nav className="mb-4 bg-white shadow-sm navbar navbar-expand-lg navbar-light sticky-top">
         <div className="container">
-          <div className="d-flex align-items-center gap-3">
+          <div className="gap-3 d-flex align-items-center">
             <Link
               href="/game"
-              className="btn btn-outline-secondary rounded-pill px-3 fw-bold btn-sm"
+              className="px-3 btn btn-outline-secondary rounded-pill fw-bold btn-sm"
             >
               <i className="bi bi-arrow-left"></i> Back
             </Link>
-            <span className="navbar-brand mb-0 h1 fw-bold text-primary d-none d-sm-block">
+            <span className="mb-0 navbar-brand h1 fw-bold text-primary d-none d-sm-block">
               HenTexto
             </span>
           </div>
-
-          <div className="d-flex align-items-center gap-2 text-muted fw-bold font-monospace">
-            <span className="d-none d-md-inline">Guesses:</span>
-            <span className="badge bg-dark rounded-pill px-3">
-              {guesses.length}
-            </span>
+          <div className="gap-3 d-flex align-items-center">
+            <div className="text-muted fw-bold font-monospace small">
+              Guesses:{" "}
+              <span className="badge bg-dark rounded-pill">
+                {guesses.length}
+              </span>
+            </div>
+            <button
+              className="btn btn-sm btn-outline-danger rounded-pill fw-bold"
+              onClick={handleResetGame}
+            >
+              Reset
+            </button>
           </div>
         </div>
       </nav>
 
-      {/* --- MAIN GAME CONTAINER --- */}
       <div className="container d-flex flex-column align-items-center animate-in fade-in">
-        {/* --- HEADER TEXT --- */}
         {!winItem && (
-          <div className="text-center mb-4">
+          <div className="mb-4 text-center">
             <h2 className="fw-bold text-dark">Truy tìm Anime</h2>
             <p className="text-muted">
               Đoán tên Haiten và xem bạn đang ở "gần" hay "xa" đáp án!
@@ -159,28 +206,25 @@ export default function HanidleGamePage() {
           </div>
         )}
 
-        {/* --- WIN STATE --- */}
         {winItem && (
           <div
-            className="w-100 mb-5 animate-in zoom-in duration-500"
+            className="mb-5 w-100 animate-in zoom-in"
             style={{ maxWidth: "500px" }}
           >
-            <div className="card border-0 shadow-lg overflow-hidden rounded-4">
-              <div className="card-header bg-success text-white text-center py-3">
-                <h3 className="fw-bold mb-0">🎉 CHÍNH XÁC!</h3>
+            <div className="overflow-hidden text-center border-0 shadow-lg card rounded-4">
+              <div className="py-3 text-white card-header bg-success">
+                <h3 className="mb-0 fw-bold">🎉 CHÍNH XÁC!</h3>
               </div>
-              <div className="card-body text-center p-4 bg-white">
-                <p className="text-muted mb-3">Đáp án bí mật chính là:</p>
-
-                <div className="d-flex justify-content-center mb-4">
+              <div className="p-4 bg-white card-body">
+                <p className="mb-3 text-muted">Đáp án bí mật chính là:</p>
+                <div className="mb-4 d-flex justify-content-center">
                   <div style={{ maxWidth: "240px", width: "100%" }}>
                     <AnimeCard item={winItem} />
                   </div>
                 </div>
-
                 <button
-                  className="btn btn-success btn-lg rounded-pill px-5 fw-bold shadow-sm hover-scale"
-                  onClick={() => window.location.reload()}
+                  className="px-5 shadow-sm btn btn-success btn-lg rounded-pill fw-bold"
+                  onClick={handleResetGame}
                 >
                   Chơi ván mới 🔄
                 </button>
@@ -189,28 +233,23 @@ export default function HanidleGamePage() {
           </div>
         )}
 
-        {/* --- GAMEPLAY AREA --- */}
         {!winItem && (
           <div
             className="w-100 d-flex flex-column align-items-center"
             style={{ maxWidth: "600px" }}
           >
-            {/* 3. HIỂN THỊ BỘ VỪA ĐOÁN (LAST GUESS) */}
             {lastGuess && (
-              <div className="w-100 mb-3 animate-in slide-in-from-top fade-in">
-                <div className="bg-white p-3 rounded-4 shadow-sm border border-primary border-opacity-25 d-flex align-items-center gap-3">
-                  {/* Ảnh Thumbnail */}
+              <div className="mb-3 w-100 animate-in slide-in-from-top">
+                <div className="gap-3 p-3 bg-white border border-opacity-25 shadow-sm rounded-4 border-primary d-flex align-items-center">
                   <div style={{ width: "60px", height: "80px", flexShrink: 0 }}>
                     <img
                       src={lastGuess.thumbnail}
                       alt={lastGuess.title}
-                      className="w-100 h-100 object-fit-cover rounded-3 shadow-sm"
+                      className="shadow-sm w-100 h-100 object-fit-cover rounded-3"
                     />
                   </div>
-
-                  {/* Thông tin */}
-                  <div className="flex-grow-1 overflow-hidden">
-                    <div className="d-flex justify-content-between align-items-start mb-1">
+                  <div className="overflow-hidden flex-grow-1">
+                    <div className="mb-1 d-flex justify-content-between align-items-start">
                       <small
                         className="text-muted text-uppercase fw-bold"
                         style={{ fontSize: "0.7rem" }}
@@ -229,7 +268,7 @@ export default function HanidleGamePage() {
                         #{lastGuess.rank}
                       </span>
                     </div>
-                    <h6 className="fw-bold text-dark mb-0 text-truncate">
+                    <h6 className="mb-0 fw-bold text-dark text-truncate">
                       {lastGuess.title}
                     </h6>
                   </div>
@@ -237,13 +276,11 @@ export default function HanidleGamePage() {
               </div>
             )}
 
-            {/* SEARCH INPUT */}
-            <div className="w-100 mb-3 shadow-sm rounded-4 bg-white border p-1">
+            <div className="p-1 mb-3 bg-white border shadow-sm w-100 rounded-4">
               <GameSearch onGuess={handleGuess} disabled={loading} />
             </div>
 
-            {/* STATS & HINT BAR */}
-            <div className="w-100 d-flex justify-content-between align-items-center mb-3 px-2">
+            <div className="px-2 mb-3 w-100 d-flex justify-content-between align-items-center">
               <div className="text-muted fst-italic small">
                 {hintLogic.nextUnlock > 0 && !hintLogic.isMaxed ? (
                   <span>
@@ -257,40 +294,38 @@ export default function HanidleGamePage() {
                   </span>
                 )}
               </div>
-
               <button
                 onClick={handleUseHint}
                 disabled={hintLogic.available <= 0 || hintLogic.isMaxed}
-                className={`btn btn-sm rounded-pill d-flex align-items-center gap-2 shadow-sm transition-all border ${
+                className={`btn btn-sm rounded-pill d-flex align-items-center gap-2 shadow-sm border ${
                   hintLogic.available > 0
-                    ? "btn-white text-primary border-primary hover-scale fw-bold"
+                    ? "btn-white text-primary border-primary fw-bold"
                     : "btn-light text-muted border-0"
                 }`}
               >
                 <span>💡 Gợi ý</span>
                 {hintLogic.available > 0 && (
-                  <span className="badge bg-danger text-white rounded-circle">
+                  <span className="text-white badge bg-danger rounded-circle">
                     {hintLogic.available}
                   </span>
                 )}
               </button>
             </div>
 
-            {/* HIỂN THỊ HINTS ĐÃ MỞ */}
             {hintsUsed > 0 && (
-              <div className="w-100 mb-4 bg-white p-3 rounded-4 shadow-sm border border-light animate-in fade-in">
+              <div className="p-3 mb-4 bg-white border shadow-sm w-100 rounded-4 border-light animate-in fade-in">
                 <h6
-                  className="text-muted text-uppercase fw-bold mb-3"
+                  className="mb-3 text-muted text-uppercase fw-bold"
                   style={{ fontSize: "0.75rem" }}
                 >
                   <i className="bi bi-unlock-fill me-2"></i>Thông tin đã giải
                   mã:
                 </h6>
-                <div className="d-flex flex-wrap gap-2">
+                <div className="flex-wrap gap-2 d-flex">
                   {hintLogic.revealList.slice(0, hintsUsed).map((hint, idx) => (
                     <span
                       key={idx}
-                      className={`badge ${hint.color} border px-3 py-2 animate-in zoom-in text-dark fw-normal`}
+                      className={`badge ${hint.color} border px-3 py-2 text-dark fw-normal`}
                     >
                       <span className="opacity-50 me-1">{hint.type}:</span>
                       <span className="fw-bold">{hint.value}</span>
@@ -300,7 +335,6 @@ export default function HanidleGamePage() {
               </div>
             )}
 
-            {/* LIST GUESSES (Xếp hạng) */}
             <div className="w-100">
               <GuessLog guesses={guesses} />
             </div>

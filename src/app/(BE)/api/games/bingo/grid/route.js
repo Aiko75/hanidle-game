@@ -1,23 +1,25 @@
 import { NextResponse } from "next/server";
-import animeData from "@/../public/data/ihentai_all.json";
+import hanimeData from "@/../public/data/ihentai_all.json";
+import animeData from "@/../public/data/anime_full.json";
 
 const GRID_SIZE = 16;
-const CURRENT_YEAR = new Date().getFullYear(); // 2025
+const CURRENT_YEAR = new Date().getFullYear();
 
-// Helper lấy random
+// Helper
 const randomItem = (arr) => arr[Math.floor(Math.random() * arr.length)];
 const randomInt = (min, max) =>
   Math.floor(Math.random() * (max - min + 1)) + min;
 
-export async function GET() {
+export async function GET(request) {
   try {
-    // 1. Thu thập dữ liệu thực tế từ DB để làm "Pool" (Bể chứa)
-    // Dùng Set để tự động loại bỏ trùng lặp ngay từ đầu
+    const mode = request.headers.get("x-app-mode");
+    const sourceData = mode === "hanime" ? hanimeData : animeData;
+
     const allGenres = new Set();
     const allStudios = new Set();
     const allYears = new Set();
 
-    animeData.forEach((anime) => {
+    sourceData.forEach((anime) => {
       anime.genres?.forEach((g) => allGenres.add(g.name));
       anime.studios?.forEach((s) => allStudios.add(s.name));
       if (anime.releaseYear?.name)

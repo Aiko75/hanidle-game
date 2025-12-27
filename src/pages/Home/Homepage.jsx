@@ -2,13 +2,22 @@
 
 import { useRouter } from "next/navigation";
 import "bootstrap/dist/css/bootstrap.min.css";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import ModeToggle from "@/components/ui/ModeToggle";
+import Cookies from "js-cookie";
 
 export default function Homepage() {
   const router = useRouter();
 
   // State để xử lý hiệu ứng hover đơn giản
   const [hoveredCard, setHoveredCard] = useState(null);
+  const [currentMode, setCurrentMode] = useState("anime");
+
+  // 3. [CHANGE] Effect đọc Cookie để chọn dữ liệu
+  useEffect(() => {
+    const mode = Cookies.get("app_mode") || "anime";
+    setCurrentMode(mode);
+  }, []);
 
   return (
     <div
@@ -20,9 +29,9 @@ export default function Homepage() {
       }}
     >
       {/* Header Section */}
-      <div className="text-center mb-5 animate-in fade-in">
+      <div className="mb-5 text-center animate-in fade-in">
         <h1
-          className="display-3 fw-bold mb-3"
+          className="mb-3 display-3 fw-bold"
           style={{ textShadow: "0 0 20px rgba(168, 85, 247, 0.5)" }}
         >
           <span className="text-white">H-Anidle</span>{" "}
@@ -33,6 +42,7 @@ export default function Homepage() {
           chứ tôi ko có viết:)))
         </p>
         <p className="lead text-white-50">Dữ liệu được lấy từ: 9/12/2025</p>
+        <ModeToggle />
       </div>
 
       {/* Navigation Cards */}
@@ -44,7 +54,7 @@ export default function Homepage() {
               onClick={() => router.push("/list")}
               onMouseEnter={() => setHoveredCard("library")}
               onMouseLeave={() => setHoveredCard(null)}
-              className="card h-100 border-0 shadow-lg cursor-pointer"
+              className="border-0 shadow-lg cursor-pointer card h-100"
               style={{
                 background: "rgba(255, 255, 255, 0.1)", // Glassmorphism effect
                 backdropFilter: "blur(10px)",
@@ -59,21 +69,23 @@ export default function Homepage() {
                     : "1px solid rgba(255,255,255,0.1)",
               }}
             >
-              <div className="card-body p-5 text-center d-flex flex-column align-items-center">
+              <div className="p-5 text-center card-body d-flex flex-column align-items-center">
                 <div
-                  className="mb-4 d-flex justify-content-center align-items-center bg-primary bg-opacity-25 rounded-circle"
+                  className="mb-4 bg-opacity-25 d-flex justify-content-center align-items-center bg-primary rounded-circle"
                   style={{ width: "80px", height: "80px" }}
                 >
                   <span style={{ fontSize: "40px" }}>📚</span>
                 </div>
-                <h3 className="card-title fw-bold text-white mb-2">
-                  Thư viện Anime
+                <h3 className="mb-2 text-white card-title fw-bold">
+                  {currentMode === "hanime"
+                    ? "Thư viện HAnime"
+                    : "Thư viện Anime"}
                 </h3>
-                <p className="card-text text-white-50 mb-4">
+                <p className="mb-4 card-text text-white-50">
                   Tra cứu, lọc và tìm kiếm hàng ngàn bộ anime với đầy đủ thông
                   tin chi tiết.
                 </p>
-                <button className="btn btn-primary rounded-pill px-4 fw-bold mt-auto w-100">
+                <button className="px-4 mt-auto btn btn-primary rounded-pill fw-bold w-100">
                   Truy cập ngay &rarr;
                 </button>
               </div>
@@ -86,7 +98,7 @@ export default function Homepage() {
               onClick={() => router.push("/game")}
               onMouseEnter={() => setHoveredCard("game")}
               onMouseLeave={() => setHoveredCard(null)}
-              className="card h-100 border-0 shadow-lg cursor-pointer"
+              className="border-0 shadow-lg cursor-pointer card h-100"
               style={{
                 background: "rgba(255, 255, 255, 0.1)",
                 backdropFilter: "blur(10px)",
@@ -101,21 +113,21 @@ export default function Homepage() {
                     : "1px solid rgba(255,255,255,0.1)",
               }}
             >
-              <div className="card-body p-5 text-center d-flex flex-column align-items-center">
+              <div className="p-5 text-center card-body d-flex flex-column align-items-center">
                 <div
-                  className="mb-4 d-flex justify-content-center align-items-center bg-success bg-opacity-25 rounded-circle"
+                  className="mb-4 bg-opacity-25 d-flex justify-content-center align-items-center bg-success rounded-circle"
                   style={{ width: "80px", height: "80px" }}
                 >
                   <span style={{ fontSize: "40px" }}>🎮</span>
                 </div>
-                <h3 className="card-title fw-bold text-white mb-2">
+                <h3 className="mb-2 text-white card-title fw-bold">
                   Mini Games
                 </h3>
-                <p className="card-text text-white-50 mb-4">
+                <p className="mb-4 card-text text-white-50">
                   Thử thách kiến thức của bạn với các trò chơi đoán tên, Gacha
                   nhân phẩm.
                 </p>
-                <button className="btn btn-success rounded-pill px-4 fw-bold mt-auto w-100">
+                <button className="px-4 mt-auto btn btn-success rounded-pill fw-bold w-100">
                   Chơi ngay &rarr;
                 </button>
               </div>

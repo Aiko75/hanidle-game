@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import animeData from "@/../public/data/ihentai_all.json";
+import hanimeData from "@/../public/data/ihentai_all.json";
+import animeData from "@/../public/data/anime_full.json";
 
 // Hàm kiểm tra logic khớp điều kiện
 const checkMatch = (anime, cell) => {
@@ -46,7 +47,9 @@ export async function POST(request) {
     // Bộ đếm giới hạn mỗi ô tối đa 3 card phù hợp để dàn trải đáp án
     const tempDistributionCount = Array(16).fill(0);
 
-    const shuffledRawData = [...animeData].sort(() => 0.5 - Math.random());
+    const mode = request.headers.get("x-app-mode");
+    const sourceData = mode === "hanime" ? hanimeData : animeData;
+    const shuffledRawData = [...sourceData].sort(() => 0.5 - Math.random());
 
     // --- BƯỚC 1: QUÉT DATA ĐỂ TÌM CARD PHÙ HỢP (MATCH 1-3 Ô) ---
     for (const anime of shuffledRawData) {

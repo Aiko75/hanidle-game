@@ -14,10 +14,13 @@ export async function GET(request) {
     if (limit < 1) limit = 1;
     if (limit > 50) limit = 50;
 
+    const mode = request.headers.get("x-app-mode");
+    const tableName = mode === "hanime" ? "hanimes" : "animes";
+
     const client = await pool.connect();
 
     // 2. Query Database với LIMIT động
-    const query = "SELECT * FROM animes ORDER BY RANDOM() LIMIT $1";
+    const query = `SELECT * FROM ${tableName} ORDER BY RANDOM() LIMIT $1`;
     const result = await client.query(query, [limit]);
 
     client.release();

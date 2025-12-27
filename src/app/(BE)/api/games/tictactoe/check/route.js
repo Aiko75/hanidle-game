@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import animeData from "@/../public/data/ihentai_all.json";
+import hanimeData from "@/../public/data/ihentai_all.json";
+import animeData from "@/../public/data/anime_full.json";
 
 function checkCondition(anime, attr) {
   if (!attr || !anime) return false;
@@ -26,9 +27,11 @@ function checkCondition(anime, attr) {
 export async function POST(request) {
   try {
     const { animeId, rowAttr, colAttr } = await request.json();
+    const mode = request.headers.get("x-app-mode");
+    const sourceData = mode === "hanime" ? hanimeData : animeData;
 
     // Tìm bộ anime theo ID
-    const anime = animeData.find((a) => a.id === animeId);
+    const anime = sourceData.find((a) => a.id === animeId);
 
     if (!anime) {
       return NextResponse.json({ correct: false, message: "Anime not found" });

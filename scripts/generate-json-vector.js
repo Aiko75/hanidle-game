@@ -10,7 +10,7 @@ async function generate() {
   );
 
   // 1. Đọc dữ liệu gốc
-  const dataPath = path.join(__dirname, "../public/data/ihentai_all.json");
+  const dataPath = path.join(__dirname, "../public/data/anime_full.json");
   const rawData = fs.readFileSync(dataPath, "utf-8");
   const animes = JSON.parse(rawData);
 
@@ -45,7 +45,7 @@ async function generate() {
   }
 
   // 2. Ghi ra file riêng
-  const outputPath = path.join(__dirname, "../public/data/embeddings.json");
+  const outputPath = path.join(__dirname, "../public/data/aembeddings.json");
   fs.writeFileSync(outputPath, JSON.stringify(embeddingsData));
 
   console.log(`\n✅ Xong! File vector lưu tại: ${outputPath}`);
