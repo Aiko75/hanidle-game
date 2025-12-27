@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-// Import file vector vào RAM (Next.js sẽ cache file này)
-// Đảm bảo bạn đã chạy script generate-json-vector.js ở bước trước để có file này
-import embeddings from "@/../public/data/embeddings.json";
+import aembeddings from "@/../public/data/aembeddings.json";
+import hembeddings from "@/../public/data/hembeddings.json";
 
 // Hàm toán học: Tính độ tương đồng Cosine (Cosine Similarity)
 // Input: 2 mảng vector. Output: Số từ -1 đến 1 (1 là giống hệt)
@@ -26,6 +25,8 @@ export async function POST(request) {
   try {
     const body = await request.json();
     const { guestId, secretId } = body;
+    const mode = request.headers.get("x-app-mode");
+    const sourceData = mode === "hanime" ? hembeddings : aembeddings;
 
     if (!guestId || !secretId) {
       return NextResponse.json(
@@ -35,8 +36,8 @@ export async function POST(request) {
     }
 
     // 1. Tìm vector của 2 bộ phim trong file JSON
-    const guestItem = embeddings.find((e) => e.id === guestId);
-    const secretItem = embeddings.find((e) => e.id === secretId);
+    const guestItem = sourceData.find((e) => e.id === guestId);
+    const secretItem = sourceData.find((e) => e.id === secretId);
 
     if (!guestItem || !secretItem) {
       // Trường hợp hiếm: ID có trong DB nhưng chưa được generate vector
@@ -56,7 +57,7 @@ export async function POST(request) {
     // Rank = Số lượng anime có độ giống nhau CAO HƠN bộ khách đoán
     let rank = 1;
 
-    for (const item of embeddings) {
+    for (const item of sourceData) {
       // Bỏ qua chính bộ bí mật
       if (item.id === secretId) continue;
 

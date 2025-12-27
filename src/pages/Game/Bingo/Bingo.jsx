@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { LOCAL_STORAGE_KEYS } from "@/app/constants/localKey";
+import { api } from "@/app/api/baseJsonApi";
 
 export default function BingoGamePage() {
   const [grid, setGrid] = useState([]);
@@ -12,11 +14,71 @@ export default function BingoGamePage() {
   const [lives, setLives] = useState(0);
   const [loading, setLoading] = useState(true);
   const [gameStatus, setGameStatus] = useState("setup"); // setup, playing, won, lost
-
-  // --- NEW STATES ---
   const [targetBingoGoal, setTargetBingoGoal] = useState(1); // Mục tiêu: 1, 2, 3 đường
   const [hintsLeft, setHintsLeft] = useState(3);
   const [activeHintIds, setActiveHintIds] = useState([]); // Chứa 4 ID ô đang được gợi ý
+
+  const isInitialized = useRef(false);
+  const STORAGE_KEY = LOCAL_STORAGE_KEYS.BINGO.PROGRESS;
+
+  // --- 1. LOGIC KHÔI PHỤC TIẾN TRÌNH ---
+  useEffect(() => {
+    const savedProgress = localStorage.getItem(STORAGE_KEY);
+    if (savedProgress) {
+      try {
+        const data = JSON.parse(savedProgress);
+        // Chỉ khôi phục nếu game đang trong trạng thái 'playing'
+        if (data.gameStatus === "playing") {
+          setGrid(data.grid);
+          setDeck(data.deck);
+          setCurrentIndex(data.currentIndex);
+          setSelectedCells(data.selectedCells);
+          setBingoLines(data.bingoLines);
+          setLives(data.lives);
+          setTargetBingoGoal(data.targetBingoGoal);
+          setHintsLeft(data.hintsLeft);
+          setGameStatus("playing");
+        }
+      } catch (e) {
+        console.error("Lỗi khôi phục tiến trình Bingo:", e);
+      }
+    }
+    setLoading(false);
+    isInitialized.current = true;
+  }, []);
+
+  // --- 2. LOGIC LƯU TIẾN TRÌNH TỰ ĐỘNG ---
+  useEffect(() => {
+    if (!isInitialized.current || gameStatus === "setup") return;
+
+    if (gameStatus === "playing") {
+      const stateToSave = {
+        grid,
+        deck,
+        currentIndex,
+        selectedCells,
+        bingoLines,
+        lives,
+        targetBingoGoal,
+        hintsLeft,
+        gameStatus,
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
+    } else {
+      // Nếu thắng hoặc thua, xóa dữ liệu tiến trình để ván sau chơi mới
+      localStorage.removeItem(STORAGE_KEY);
+    }
+  }, [
+    grid,
+    deck,
+    currentIndex,
+    selectedCells,
+    bingoLines,
+    lives,
+    gameStatus,
+    hintsLeft,
+    targetBingoGoal,
+  ]);
 
   const checkCondition = (anime, cell) => {
     if (!anime) return false;
@@ -58,11 +120,13 @@ export default function BingoGamePage() {
     [3, 6, 9, 12],
   ];
 
+  // --- 3. CẬP NHẬT INIT GAME (Xóa dữ liệu cũ khi bắt đầu mới) ---
   const initGame = async (goal) => {
     setLoading(true);
+    localStorage.removeItem(STORAGE_KEY); // Clear ván cũ
     setTargetBingoGoal(goal);
     setLives(goal + 2);
-    setHintsLeft(3);
+    setHintsLeft(goal + 2);
     setSelectedCells([]);
     setBingoLines([]);
     setCurrentIndex(0);
@@ -70,20 +134,14 @@ export default function BingoGamePage() {
     setGameStatus("playing");
 
     try {
-      const gridRes = await fetch("/api/games/bingo/grid");
-      const gridData = await gridRes.json();
-
+      const gridData = await api.get("/api/games/bingo/grid");
       if (gridData.success) {
         setGrid(gridData.grid);
-        const deckRes = await fetch("/api/games/bingo/deck", {
-          method: "POST",
-          body: JSON.stringify({ grid: gridData.grid, goal: goal }),
-        });
-        const deckData = await deckRes.json();
-
-        if (deckData.success) {
-          setDeck(deckData.deck);
-        }
+        const deckData = await api.post(
+          "/api/games/bingo/deck",
+          JSON.stringify({ grid: gridData.grid, goal: goal })
+        );
+        if (deckData.success) setDeck(deckData.deck);
       }
     } catch (e) {
       console.error(e);

@@ -1,8 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import GameSearch from "@/components/game/HenTexto/GameSearch";
+import { LOCAL_STORAGE_KEYS } from "@/app/constants/localKey";
+import { api } from "@/app/api/baseJsonApi";
 
 export default function TicTacToePage() {
   const [board, setBoard] = useState(null);
@@ -15,9 +17,83 @@ export default function TicTacToePage() {
   const [loading, setLoading] = useState(true);
   const [lives, setLives] = useState(9);
 
-  // --- CẤU HÌNH GIAO DIỆN (Dễ dàng chỉnh sửa tại đây) ---
+  const isInitialized = useRef(false);
+  const STORAGE_KEY = LOCAL_STORAGE_KEYS.TICTACTOE.PROGRESS;
+
+  const fetchNewBoard = async () => {
+    const res = await api.get("/api/games/tictactoe/new");
+    if (res.success) setBoard(res.board);
+    setLoading(false);
+    isInitialized.current = true;
+  };
+
+  // --- 1. LOGIC KHÔI PHỤC TIẾN TRÌNH (Sử dụng duy nhất 1 biến PROGRESS) ---
+  useEffect(() => {
+    const savedData = localStorage.getItem(STORAGE_KEY);
+
+    if (savedData) {
+      try {
+        const progress = JSON.parse(savedData);
+        // Khôi phục đồng thời toàn bộ trạng thái bàn cờ
+        setBoard(progress.board);
+        setGridState(progress.gridState);
+        setLives(progress.lives);
+        setLoading(false);
+        isInitialized.current = true;
+      } catch (e) {
+        console.error("❌ Lỗi phục hồi PROGRESS HenToHen:", e);
+        fetchNewBoard();
+      }
+    } else {
+      fetchNewBoard();
+    }
+  }, []);
+
+  // --- 2. LOGIC LƯU TIẾN TRÌNH TỰ ĐỘNG (Gộp thành 1 Object) ---
+  useEffect(() => {
+    if (!isInitialized.current || !board) return;
+
+    const progressToSave = {
+      board,
+      gridState,
+      lives,
+    };
+
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(progressToSave));
+  }, [gridState, lives, board]);
+
+  // --- 3. RESET GAME (Xóa key PROGRESS duy nhất) ---
+  const handleNewGame = () => {
+    localStorage.removeItem(STORAGE_KEY);
+    window.location.reload();
+  };
+
+  const handleGuess = async (anime) => {
+    if (!selectedCell || !board) return;
+    const { r, c } = selectedCell;
+    if (gridState[r][c]) return;
+
+    const json = await api.post(
+      "/api/games/tictactoe/check",
+      JSON.stringify({
+        animeId: anime.id,
+        rowAttr: board.rows[r],
+        colAttr: board.cols[c],
+      })
+    );
+
+    if (json.correct) {
+      const newGrid = [...gridState];
+      newGrid[r][c] = anime;
+      setGridState(newGrid);
+      setSelectedCell(null);
+    } else {
+      alert(json.message);
+      setLives((prev) => prev - 1);
+    }
+  };
+
   const styles = {
-    // Container bao ngoài cùng
     wrapper: {
       width: "100%",
       maxWidth: "800px",
@@ -27,11 +103,10 @@ export default function TicTacToePage() {
       flexDirection: "column",
       alignItems: "center",
     },
-    // Bảng Grid
     container: {
       display: "flex",
       flexDirection: "column",
-      gap: "clamp(4px, 1.5vw, 12px)", // Giãn cách tự co theo màn hình
+      gap: "clamp(4px, 1.5vw, 12px)",
       padding: "clamp(10px, 3vw, 25px)",
       backgroundColor: "white",
       borderRadius: "24px",
@@ -39,12 +114,8 @@ export default function TicTacToePage() {
       width: "100%",
       maxWidth: "fit-content",
     },
-    row: {
-      display: "flex",
-      gap: "clamp(4px, 1.5vw, 12px)",
-    },
+    row: { display: "flex", gap: "clamp(4px, 1.5vw, 12px)" },
     cellBase: {
-      // Ô sẽ có kích thước từ 70px (mobile) đến 150px (desktop)
       width: "clamp(75px, 20vw, 150px)",
       height: "clamp(75px, 20vw, 150px)",
       borderRadius: "clamp(8px, 2vw, 16px)",
@@ -55,10 +126,10 @@ export default function TicTacToePage() {
       transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
       position: "relative",
       overflow: "hidden",
-      fontSize: "clamp(0.6rem, 1.5vw, 0.9rem)", // Font chữ cũng co giãn
+      fontSize: "clamp(0.6rem, 1.5vw, 0.9rem)",
     },
     headerCell: (isRow) => ({
-      backgroundColor: isRow ? "#f0fdf4" : "#f0f9ff", // Màu xanh lá nhẹ cho hàng, xanh dương cho cột
+      backgroundColor: isRow ? "#f0fdf4" : "#f0f9ff",
       border: "1px solid rgba(0,0,0,0.05)",
       textAlign: "center",
       padding: "5px",
@@ -77,103 +148,72 @@ export default function TicTacToePage() {
     }),
   };
 
-  useEffect(() => {
-    fetch("/api/games/tictactoe/new")
-      .then((res) => res.json())
-      .then((res) => {
-        if (res.success) setBoard(res.board);
-        setLoading(false);
-      });
-  }, []);
-
-  const handleGuess = async (anime) => {
-    if (!selectedCell || !board) return;
-    const { r, c } = selectedCell;
-    if (gridState[r][c]) return;
-
-    const res = await fetch("/api/games/tictactoe/check", {
-      method: "POST",
-      body: JSON.stringify({
-        animeId: anime.id,
-        rowAttr: board.rows[r],
-        colAttr: board.cols[c],
-      }),
-    });
-    const json = await res.json();
-
-    if (json.correct) {
-      const newGrid = [...gridState];
-      newGrid[r][c] = anime;
-      setGridState(newGrid);
-      setSelectedCell(null);
-    } else {
-      alert(json.message);
-      setLives((prev) => prev - 1);
-    }
-  };
-
   if (loading)
     return (
       <div className="min-vh-100 d-flex flex-column justify-content-center align-items-center bg-light">
-        <div className="spinner-border text-primary mb-3" role="status"></div>
-        <h5 className="text-muted fw-bold tracking-tight">
-          Đang tải dữ liệu H-Anime...
-        </h5>
+        <div className="mb-3 spinner-border text-primary" role="status"></div>
+        <h5 className="text-muted fw-bold">Đang thiết lập bàn cờ...</h5>
       </div>
     );
 
   return (
-    <div className="min-vh-100 bg-light pb-5">
-      <nav className="navbar navbar-light bg-white shadow-sm sticky-top mb-4">
+    <div className="pb-5 min-vh-100 bg-light">
+      <nav className="mb-4 bg-white shadow-sm navbar navbar-light sticky-top">
         <div className="container">
           <Link
             href="/game"
-            className="btn btn-sm btn-outline-secondary rounded-pill px-3 fw-bold"
+            className="px-3 btn btn-sm btn-outline-secondary rounded-pill fw-bold"
           >
-            &larr; Back
+            {" "}
+            &larr; Back{" "}
           </Link>
-          <div className="d-flex align-items-center gap-3">
-            <div className="badge bg-danger bg-opacity-10 text-danger border border-danger px-3 py-2 rounded-pill font-monospace">
-              LIVES: {lives}
+          <div className="gap-3 d-flex align-items-center">
+            <div className="px-3 py-2 border badge bg-danger bg-opacity-10 text-danger border-danger rounded-pill font-monospace">
+              {" "}
+              LIVES: {lives}{" "}
             </div>
             <button
-              className="btn btn-sm btn-primary rounded-pill px-3 fw-bold shadow-sm"
-              onClick={() => window.location.reload()}
+              className="px-3 shadow-sm btn btn-sm btn-primary rounded-pill fw-bold"
+              onClick={handleNewGame}
             >
-              Ván mới
+              {" "}
+              Ván mới{" "}
             </button>
           </div>
         </div>
       </nav>
 
       <div style={styles.wrapper}>
-        {/* --- SEARCH AREA (Responsive) --- */}
         <div
-          className="w-100 mb-4 sticky-top"
+          className="mb-4 w-100 sticky-top"
           style={{ maxWidth: "600px", top: "75px", zIndex: 100 }}
         >
-          <div className="bg-white p-3 rounded-4 shadow-lg border mx-2">
+          <div className="p-3 mx-2 bg-white border shadow-lg rounded-4">
             {selectedCell ? (
               <div className="mb-2 text-center animate-in fade-in">
                 <small
                   className="text-muted fw-bold"
                   style={{ fontSize: "0.65rem" }}
                 >
-                  Mục tiêu:
+                  {" "}
+                  Mục tiêu:{" "}
                 </small>
-                <div className="d-flex justify-content-center align-items-center gap-1 mt-1">
+                <div className="gap-1 mt-1 d-flex justify-content-center align-items-center">
                   <span className="badge bg-success truncate-text">
-                    {board.rows[selectedCell.r].value}
+                    {" "}
+                    {board.rows[selectedCell.r].value}{" "}
                   </span>
                   <span className="text-muted">+</span>
                   <span className="badge bg-primary truncate-text">
-                    {board.cols[selectedCell.c].value}
+                    {" "}
+                    {board.cols[selectedCell.c].value}{" "}
                   </span>
                 </div>
               </div>
             ) : (
-              <p className="text-center mb-1 text-muted small fst-italic">
-                Bấm chọn ô trống bên dưới
+              <p className="mb-1 text-center text-muted small fst-italic">
+                {" "}
+                Bấm chọn ô trống bên dưới{" "}
               </p>
             )}
             <div style={{ opacity: selectedCell ? 1 : 0.4 }}>
@@ -182,9 +222,7 @@ export default function TicTacToePage() {
           </div>
         </div>
 
-        {/* --- MAIN GAME BOARD (Sử dụng clamp để res) --- */}
         <div style={styles.container}>
-          {/* Header Row */}
           <div style={styles.row}>
             <div style={styles.cellBase}></div>
             {board?.cols?.map((col, i) => (
@@ -196,16 +234,17 @@ export default function TicTacToePage() {
                   className="text-primary text-uppercase"
                   style={{ fontSize: "0.55rem", opacity: 0.6 }}
                 >
-                  {col.type}
+                  {" "}
+                  {col.type}{" "}
                 </b>
-                <div className="fw-bold mt-1 line-clamp-2 px-1">
-                  {col.value}
+                <div className="px-1 mt-1 fw-bold line-clamp-2">
+                  {" "}
+                  {col.value}{" "}
                 </div>
               </div>
             ))}
           </div>
 
-          {/* Data Rows */}
           {board?.rows?.map((row, r) => (
             <div key={r} style={styles.row}>
               <div style={{ ...styles.cellBase, ...styles.headerCell(true) }}>
@@ -213,13 +252,14 @@ export default function TicTacToePage() {
                   className="text-success text-uppercase"
                   style={{ fontSize: "0.55rem", opacity: 0.6 }}
                 >
-                  {row.type}
+                  {" "}
+                  {row.type}{" "}
                 </b>
-                <div className="fw-bold mt-1 line-clamp-2 px-1">
-                  {row.value}
+                <div className="px-1 mt-1 fw-bold line-clamp-2">
+                  {" "}
+                  {row.value}{" "}
                 </div>
               </div>
-
               {gridState[r].map((cellData, c) => {
                 const isSelected =
                   selectedCell?.r === r && selectedCell?.c === c;
@@ -249,7 +289,8 @@ export default function TicTacToePage() {
                       />
                     ) : (
                       <span className="opacity-25" style={{ fontSize: "2rem" }}>
-                        +
+                        {" "}
+                        +{" "}
                       </span>
                     )}
                   </div>
@@ -259,20 +300,6 @@ export default function TicTacToePage() {
           ))}
         </div>
       </div>
-
-      <style jsx>{`
-        .truncate-text {
-          max-width: 100px;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-        @media (max-width: 576px) {
-          .truncate-text {
-            max-width: 70px;
-          }
-        }
-      `}</style>
     </div>
   );
 }
