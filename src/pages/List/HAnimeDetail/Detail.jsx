@@ -4,6 +4,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation"; // Hook lấy param từ URL
+import { api } from "@/app/api/baseJsonApi";
 
 export default function AnimeDetailPage() {
   const params = useParams(); // Lấy ID từ URL (/list/123 -> slugId = 123)
@@ -18,9 +19,7 @@ export default function AnimeDetailPage() {
 
     const fetchDetail = async () => {
       try {
-        const res = await fetch(`/api/hanimes/detail/${slugId}`);
-        const json = await res.json();
-
+        const json = await api.get(`/api/hanimes/detail/${slugId}`);
         if (json.success) {
           setAnime(json.data);
         } else {

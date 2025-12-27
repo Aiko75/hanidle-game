@@ -15,10 +15,13 @@ export async function GET(request, { params }) {
       );
     }
 
+    const mode = request.headers.get("x-app-mode");
+    const tableName = mode === "hanime" ? "hanimes" : "animes";
+
     const client = await pool.connect();
 
     // 2. Query Database tìm bộ anime theo id
-    const query = "SELECT * FROM animes WHERE id = $1";
+    const query = `SELECT * FROM ${tableName} WHERE id = $1`;
     const result = await client.query(query, [id]);
 
     client.release();

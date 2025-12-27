@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import AnimeCard from "@/components/list/AnimeCard";
 import AnimeCardSkeleton from "@/components/ui/AnimeCardSkeleton";
+import { api } from "@/app/api/baseJsonApi";
 
 export default function RandomPage() {
   const [animes, setAnimes] = useState([]);
@@ -13,7 +14,7 @@ export default function RandomPage() {
     setLoading(true);
     setAnimes([]);
     try {
-      const res = await fetch("/api/hanimes/random", { cache: "no-store" });
+      const res = await api.get("/api/hanimes/random", { cache: "no-store" });
       const json = await res.json();
 
       if (json.success) {
@@ -32,23 +33,23 @@ export default function RandomPage() {
   return (
     <div className="container py-5 min-vh-100">
       {/* Navigation Back */}
-      <div className="d-flex justify-content-between align-items-center mb-4">
+      <div className="mb-4 d-flex justify-content-between align-items-center">
         <Link
           href="/list"
-          className="btn btn-outline-secondary btn-sm rounded-pill px-3"
+          className="px-3 btn btn-outline-secondary btn-sm rounded-pill"
         >
           &larr; Quay lại thư viện
         </Link>
-        <span className="badge bg-light text-dark border">
+        <span className="border badge bg-light text-dark">
           Mode: Batch Summon x20
         </span>
       </div>
 
-      <div className="text-center mb-5">
-        <h1 className="display-5 fw-bold text-primary mb-3">
+      <div className="mb-5 text-center">
+        <h1 className="mb-3 display-5 fw-bold text-primary">
           🎰 Gacha 210 Time
         </h1>
-        <p className="text-muted mb-4">
+        <p className="mb-4 text-muted">
           Nhân phẩm của bạn thế nào? Quay thử 20 bộ nhé!
         </p>
 
@@ -95,12 +96,12 @@ export default function RandomPage() {
 
       {/* CASE 3: CHƯA CÓ GÌ (INITIAL STATE) */}
       {!loading && animes.length === 0 && (
-        <div className="text-center py-5">
+        <div className="py-5 text-center">
           <div
-            className="alert alert-light d-inline-block border shadow-sm px-5 py-4"
+            className="px-5 py-4 border shadow-sm alert alert-light d-inline-block"
             role="alert"
           >
-            <div className="fs-1 mb-2">👇</div>
+            <div className="mb-2 fs-1">👇</div>
             <strong>Bấm nút phía trên để quay 20 bộ ngẫu nhiên!</strong>
           </div>
         </div>

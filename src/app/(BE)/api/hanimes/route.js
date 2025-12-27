@@ -12,12 +12,15 @@ export async function GET(request) {
     const search = searchParams.get("search") || "";
     const offset = (page - 1) * limit;
 
+    const mode = request.headers.get("x-app-mode");
+    const tableName = mode === "hanime" ? "hanimes" : "animes";
+
     const client = await pool.connect();
 
     // 1. Query đếm tổng số (để tính số trang)
     // ILIKE là cú pháp tìm kiếm không phân biệt hoa thường của Postgres
     const countQuery = `
-        SELECT COUNT(*) FROM animes 
+        SELECT COUNT(*) FROM ${tableName}
         WHERE title ILIKE $1
     `;
     const countRes = await client.query(countQuery, [`%${search}%`]);
@@ -26,7 +29,7 @@ export async function GET(request) {
 
     // 2. Query lấy dữ liệu phân trang
     const dataQuery = `
-        SELECT * FROM animes 
+        SELECT * FROM ${tableName} 
         WHERE title ILIKE $1 
         ORDER BY created_at DESC 
         LIMIT $2 OFFSET $3
