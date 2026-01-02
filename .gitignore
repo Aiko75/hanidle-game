@@ -31,7 +31,7 @@ yarn-error.log*
 .pnpm-debug.log*
 
 # env files (can opt-in for committing if needed)
-.env*
+# .env*
 
 # vercel
 .vercel
@@ -39,3 +39,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+scripts/seed.js
+scripts/generate-embeddings.js
+public/data/ihentai_all.json
+public/data/ihentai_all.csv
+public/data/anime_full.json
+public/data/anime_full.csv
+scripts/sync_metadata.js
