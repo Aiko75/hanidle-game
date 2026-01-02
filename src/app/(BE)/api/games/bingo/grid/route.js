@@ -1,76 +1,94 @@
 import { NextResponse } from "next/server";
-import hanimeData from "@/../public/data/ihentai_all.json";
-import animeData from "@/../public/data/anime_full.json";
+import pool from "@/lib/db";
+
+export const dynamic = "force-dynamic";
 
 const GRID_SIZE = 16;
 const CURRENT_YEAR = new Date().getFullYear();
 
-// Helper
+// Helper functions
 const randomItem = (arr) => arr[Math.floor(Math.random() * arr.length)];
 const randomInt = (min, max) =>
   Math.floor(Math.random() * (max - min + 1)) + min;
 
 export async function GET(request) {
+  let client;
   try {
-    const mode = request.headers.get("x-app-mode");
-    const sourceData = mode === "hanime" ? hanimeData : animeData;
+    const mode = request.headers.get("app_mode") || "anime";
+    const tableName = mode === "hanime" ? "hanimes" : "animes";
 
-    const allGenres = new Set();
-    const allStudios = new Set();
-    const allYears = new Set();
+    client = await pool.connect();
 
-    sourceData.forEach((anime) => {
-      anime.genres?.forEach((g) => allGenres.add(g.name));
-      anime.studios?.forEach((s) => allStudios.add(s.name));
-      if (anime.releaseYear?.name)
-        allYears.add(parseInt(anime.releaseYear.name));
-    });
+    // 1. Lấy dữ liệu mẫu từ DB (Subquery để distinct trước khi random)
+    const queries = {
+      genres: `
+        SELECT val FROM (
+            SELECT DISTINCT elem->>'name' as val 
+            FROM ${tableName}, jsonb_array_elements(genres) elem
+        ) sub_query
+        ORDER BY RANDOM() LIMIT 20
+      `,
+      studios: `
+        SELECT val FROM (
+            SELECT DISTINCT elem->>'name' as val 
+            FROM ${tableName}, jsonb_array_elements(studios) elem
+        ) sub_query
+        ORDER BY RANDOM() LIMIT 20
+      `,
+      years: `
+        SELECT val FROM (
+            SELECT DISTINCT release_year as val 
+            FROM ${tableName} 
+            WHERE release_year <= ${CURRENT_YEAR}
+        ) sub_query
+        ORDER BY RANDOM() LIMIT 15
+      `,
+    };
 
-    // Chuyển về Array để random
-    const genrePool = Array.from(allGenres);
-    const studioPool = Array.from(allStudios);
-    const yearPool = Array.from(allYears).filter((y) => y <= CURRENT_YEAR); // Lọc bỏ năm tương lai nếu data rác
+    const [genreRes, studioRes, yearRes] = await Promise.all([
+      client.query(queries.genres),
+      client.query(queries.studios),
+      client.query(queries.years),
+    ]);
+
+    const genrePool = genreRes.rows.map((r) => r.val);
+    const studioPool = studioRes.rows.map((r) => r.val);
+    const yearPool = yearRes.rows.map((r) => r.val);
 
     const grid = [];
-    const usedLabels = new Set(); // Bộ nhớ chống trùng tuyệt đối
+    const usedLabels = new Set();
 
-    // Định nghĩa các loại Generator
-    // Chúng ta sẽ xoay vòng các loại này để bảng đa dạng
     const types = ["genre", "studio", "year", "view", "meta"];
 
     let safetyLoop = 0;
     while (grid.length < GRID_SIZE && safetyLoop < 1000) {
       safetyLoop++;
-
       const type = randomItem(types);
       let cell = null;
 
-      // LOGIC SINH DỮ LIỆU
-      if (type === "genre") {
+      // Logic sinh ô
+      if (type === "genre" && genrePool.length > 0) {
         const val = randomItem(genrePool);
         cell = { type: "genre", label: `Genre: ${val}`, value: val };
-      } else if (type === "studio") {
+      } else if (type === "studio" && studioPool.length > 0) {
         const val = randomItem(studioPool);
         cell = { type: "studio", label: `Studio: ${val}`, value: val };
-      } else if (type === "year") {
-        // Random kiểu điều kiện năm
+      } else if (type === "year" && yearPool.length > 0) {
         const subType = randomItem(["eq", "gt", "lt"]);
         const year = randomItem(yearPool);
 
         if (subType === "eq") {
           cell = { type: "year_eq", label: `Năm ${year}`, value: year };
         } else if (subType === "gt") {
-          // Đảm bảo không sinh ra "Sau năm 2025"
           const y = Math.min(year, CURRENT_YEAR - 1);
           cell = { type: "year_gt", label: `Sau năm ${y}`, value: y };
         } else {
-          // Đảm bảo không sinh ra "Trước năm 1900"
           const y = Math.max(year, 2000);
           cell = { type: "year_lt", label: `Trước năm ${y}`, value: y };
         }
       } else if (type === "view") {
         const subType = randomItem(["gt", "lt"]);
-        const kView = randomInt(1, 50) * 100; // 100k -> 5000k
+        const kView = randomInt(1, 50) * 100;
         if (subType === "gt") {
           cell = {
             type: "views_gt",
@@ -104,7 +122,6 @@ export async function GET(request) {
           cell = { type: "category", label: "Anime 3D", value: "hen3d" };
       }
 
-      // CHECK TRÙNG LẶP
       if (cell && !usedLabels.has(cell.label)) {
         usedLabels.add(cell.label);
         grid.push({ ...cell, id: grid.length });
@@ -113,9 +130,12 @@ export async function GET(request) {
 
     return NextResponse.json({ success: true, grid });
   } catch (error) {
+    console.error("❌ Bingo Grid Error:", error);
     return NextResponse.json(
-      { success: false, error: "Error" },
+      { success: false, error: error.message },
       { status: 500 }
     );
+  } finally {
+    if (client) client.release();
   }
 }

@@ -1,22 +1,29 @@
-// src/components/HAnime/FilterBar.jsx
 "use client";
 
 export default function FilterBar({
-  filters, // Object chứa toàn bộ giá trị state (filterGenre, minYear...)
-  options, // Object chứa danh sách uniqueGenres, uniqueStudios
-  onUpdate, // Hàm xử lý chung khi input thay đổi
-  onReset, // Hàm reset
+  filters,
+  options, // { genres: [], studios: [] }
+  loading, // Có thể dùng để hiện skeleton hoặc disabled state
+  onUpdate,
+  onReset,
 }) {
+  // Helper để thêm "All" vào đầu danh sách nếu chưa có
+  const getOptionsWithAll = (list) => {
+    if (!list) return ["All"];
+    return ["All", ...list];
+  };
+
   return (
-    <div className="bg-white p-6 rounded-xl shadow-sm mb-8 space-y-4">
-      {/* Hàng 1: Dropdown cơ bản */}
-      <div className="flex flex-col md:flex-row gap-4">
+    <div className="p-6 mb-8 space-y-4 bg-white shadow-sm rounded-xl">
+      {/* Hàng 1: Dropdown cơ bản (Thêm TAG) */}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         {/* Genre Select */}
         <FilterSelect
           label="Thể loại"
           value={filters.genre}
           onChange={(val) => onUpdate("genre", val)}
-          options={options.genres}
+          options={getOptionsWithAll(options?.genres)}
+          disabled={loading}
         />
 
         {/* Studio Select */}
@@ -24,18 +31,19 @@ export default function FilterBar({
           label="Studio"
           value={filters.studio}
           onChange={(val) => onUpdate("studio", val)}
-          options={options.studios}
+          options={getOptionsWithAll(options?.studios)}
+          disabled={loading}
         />
 
         {/* Sort Select */}
-        <div className="flex flex-col gap-1 flex-1">
+        <div className="flex flex-col flex-1 gap-1">
           <label className="text-xs font-bold uppercase text-zinc-500">
             Sắp xếp
           </label>
           <select
             value={filters.sortBy}
             onChange={(e) => onUpdate("sortBy", e.target.value)}
-            className="w-full p-2 rounded-lg bg-zinc-100 text-black border border-zinc-200 outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full p-2 text-black border rounded-lg outline-none border-zinc-200 bg-zinc-100 focus:ring-2 focus:ring-blue-500"
           >
             <option value="newest">Năm (Mới nhất)</option>
             <option value="oldest">Năm (Cũ nhất)</option>
@@ -48,7 +56,7 @@ export default function FilterBar({
       <hr className="border-zinc-200" />
 
       {/* Hàng 2: Range Filters */}
-      <div className="flex flex-col md:flex-row gap-6">
+      <div className="flex flex-col gap-6 md:flex-row">
         <RangeInput
           label="Năm phát hành"
           minVal={filters.minYear}
@@ -73,7 +81,7 @@ export default function FilterBar({
         <div className="flex items-end">
           <button
             onClick={onReset}
-            className="px-6 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition text-sm font-semibold h-[38px] w-full md:w-auto"
+            className="w-full px-6 py-2 text-sm font-semibold text-white transition bg-red-500 rounded-lg hover:bg-red-600 h-[38px] md:w-auto"
           >
             Reset All
           </button>
@@ -83,17 +91,18 @@ export default function FilterBar({
   );
 }
 
-// Sub-component nhỏ để tái sử dụng trong FilterBar cho gọn
-function FilterSelect({ label, value, onChange, options }) {
+// Sub-component (Thêm prop disabled)
+function FilterSelect({ label, value, onChange, options, disabled }) {
   return (
-    <div className="flex flex-col gap-1 flex-1">
+    <div className="flex flex-col flex-1 gap-1">
       <label className="text-xs font-bold uppercase text-zinc-500">
         {label}
       </label>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full p-2 rounded-lg bg-zinc-100 text-black border-zinc-200 outline-none focus:ring-2 focus:ring-blue-500"
+        disabled={disabled}
+        className="w-full p-2 text-black border rounded-lg outline-none border-zinc-200 bg-zinc-100 focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
       >
         {options.map((opt) => (
           <option key={opt} value={opt}>
@@ -116,7 +125,7 @@ function RangeInput({
 }) {
   return (
     <div className="flex-1">
-      <label className="text-xs font-bold uppercase text-zinc-500 mb-1 block">
+      <label className="block mb-1 text-xs font-bold uppercase text-zinc-500">
         {label}
       </label>
       <div className="flex items-center gap-2">
@@ -125,7 +134,7 @@ function RangeInput({
           placeholder={placeholderMin}
           value={minVal}
           onChange={(e) => onMinChange(e.target.value)}
-          className="w-full p-2 rounded-lg bg-zinc-100 text-black border-zinc-200 text-sm"
+          className="w-full p-2 text-sm text-black border rounded-lg border-zinc-200 bg-zinc-100"
         />
         <span className="text-zinc-400">-</span>
         <input
@@ -133,7 +142,7 @@ function RangeInput({
           placeholder={placeholderMax}
           value={maxVal}
           onChange={(e) => onMaxChange(e.target.value)}
-          className="w-full p-2 rounded-lg bg-zinc-100 text-black border-zinc-200 text-sm"
+          className="w-full p-2 text-sm text-black border rounded-lg border-zinc-200 bg-zinc-100"
         />
       </div>
     </div>

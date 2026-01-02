@@ -1,48 +1,51 @@
 "use client";
 
-import hanimeData from "@/../public/data/ihentai_all.json";
-import animeData from "@/../public/data/anime_full.json";
-import { LOCAL_STORAGE_KEYS } from "@/app/constants/localKey";
+import { LOCAL_STORAGE_KEYS } from "@/constants/localKey";
 import AnimeGrid from "@/components/list/AnimeGrid";
 import FilterBar from "@/components/list/FilterBar";
 import Link from "next/link";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useMemo, useCallback, useState, useEffect, useRef } from "react";
 import Cookies from "js-cookie";
+import { useGetFilters } from "@/hooks/useGetFilters";
+import AnimeCardSkeleton from "@/components/ui/AnimeCardSkeleton";
+import { api } from "@/app/api/baseJsonApi";
 
-export default function HAnimeList() {
+export default function List() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
 
-  const itemsPerPage = 20;
+  const itemsPerPage = 20; // Số lượng skeleton sẽ khớp với số này
   const isInitialized = useRef(false);
 
-  // 2. [CHANGE] State để lưu Mode và Data hiện tại
-  // Mặc định là animeData để tránh Hydration Error, sẽ cập nhật ngay trong useEffect
-  const [activeData, setActiveData] = useState(animeData);
-  const [currentMode, setCurrentMode] = useState("anime");
-  const [isDataLoaded, setIsDataLoaded] = useState(false); // Flag để tránh flash content
-  // State cho Search và Page
+  // --- STATE ---
+  const [activeData, setActiveData] = useState([]);
+  const [totalItems, setTotalItems] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Lấy mode từ cookie ngay lúc mount để truyền vào hook
+  const [currentMode, setCurrentMode] = useState(() => {
+    const saved = Cookies.get("app_mode");
+    return saved || "anime";
+  });
+
+  useEffect(() => {
+    const savedMode = Cookies.get("app_mode");
+    if (savedMode && savedMode !== currentMode) {
+      setCurrentMode(savedMode);
+    }
+  }, [currentMode]);
+
+  // --- GỌI HOOK LẤY FILTER OPTIONS ---
+  const { filterOptions, loading: loadingFilters } = useGetFilters(currentMode);
+
+  // State cho UI
   const [localSearch, setLocalSearch] = useState(searchParams.get("q") || "");
   const currentPage = parseInt(searchParams.get("page") || "1");
   const [pageInput, setPageInput] = useState(currentPage.toString());
 
-  // 3. [CHANGE] Effect đọc Cookie để chọn dữ liệu
-  useEffect(() => {
-    const mode = Cookies.get("app_mode") || "anime";
-    setCurrentMode(mode);
-
-    // Chọn nguồn dữ liệu dựa trên mode
-    if (mode === "hanime") {
-      setActiveData(hanimeData);
-    } else {
-      setActiveData(animeData);
-    }
-    setIsDataLoaded(true);
-  }, []);
-
-  const searchTerm = searchParams.get("q") || "";
+  // Lấy filters từ URL
   const filters = useMemo(
     () => ({
       genre: searchParams.get("genre") || "All",
@@ -56,20 +59,63 @@ export default function HAnimeList() {
     [searchParams]
   );
 
-  // --- LOGIC KHỞI TẠO TỪ LOCAL STORAGE ---
+  // --- FETCH DATA ---
+  const fetchLibraryData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const mode = Cookies.get("app_mode") || "anime";
+      setCurrentMode(mode);
+
+      const params = new URLSearchParams(searchParams.toString());
+      if (!params.has("limit")) params.set("limit", itemsPerPage.toString());
+
+      const filterBody = {
+        genre: filters.genre,
+        studio: filters.studio,
+        tag: filters.tag,
+        minYear: filters.minYear,
+        maxYear: filters.maxYear,
+        minView: filters.minView,
+        maxView: filters.maxView,
+      };
+
+      const result = await api.post(`/api/data?${params.toString()}`, {
+        page: currentPage,
+        limit: itemsPerPage,
+        search: localSearch,
+        mode: mode,
+        sortBy: filters.sortBy,
+        filters: filterBody,
+      });
+
+      if (result.success) {
+        setActiveData(result.data);
+        setTotalItems(result.pagination.totalItems);
+      }
+    } catch (error) {
+      console.error("❌ API Fetch Error:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [searchParams, filters, currentPage, localSearch]);
+
+  useEffect(() => {
+    fetchLibraryData();
+  }, [fetchLibraryData]);
+
+  // --- 2. LOGIC PERSISTENCE ---
   useEffect(() => {
     const savedPage = localStorage.getItem(LOCAL_STORAGE_KEYS.LIST.PAGE);
     const urlPage = searchParams.get("page");
 
     if (!urlPage && savedPage) {
-      const params = new URLSearchParams(searchParams.toString());
-      params.set("page", savedPage);
-      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+      const p = new URLSearchParams(searchParams.toString());
+      p.set("page", savedPage);
+      router.replace(`${pathname}?${p.toString()}`, { scroll: false });
     }
     isInitialized.current = true;
   }, [pathname, router, searchParams]);
 
-  // --- LOGIC LƯU TRANG VÀO LOCAL STORAGE ---
   useEffect(() => {
     if (isInitialized.current) {
       localStorage.setItem(
@@ -79,62 +125,7 @@ export default function HAnimeList() {
     }
   }, [currentPage]);
 
-  // 4. [CHANGE] Logic lọc dữ liệu (Sử dụng activeData thay vì data)
-  const filteredData = useMemo(() => {
-    if (!isDataLoaded) return []; // Chưa load xong thì trả về rỗng
-
-    let result = [...activeData]; // <-- Dùng activeData
-
-    if (searchTerm.trim() !== "") {
-      const lowerSearch = searchTerm.toLowerCase();
-      result = result.filter((item) =>
-        item.title?.toLowerCase().includes(lowerSearch)
-      );
-    }
-    if (filters.genre !== "All")
-      result = result.filter((item) =>
-        item.genres?.some((g) => g.name === filters.genre)
-      );
-    if (filters.studio !== "All")
-      result = result.filter((item) =>
-        item.studios?.some((s) => s.name === filters.studio)
-      );
-
-    result = result.filter((item) => {
-      const itemYear = parseInt(item.releaseYear?.name || "0");
-      const itemViews = item.views || 0;
-      if (filters.minYear && itemYear < parseInt(filters.minYear)) return false;
-      if (filters.maxYear && itemYear > parseInt(filters.maxYear)) return false;
-      if (filters.minView && itemViews < parseInt(filters.minView))
-        return false;
-      if (filters.maxView && itemViews > parseInt(filters.maxView))
-        return false;
-      return true;
-    });
-
-    result.sort((a, b) => {
-      const vA = a.views || 0,
-        vB = b.views || 0;
-      const yA = parseInt(a.releaseYear?.name || "0"),
-        yB = parseInt(b.releaseYear?.name || "0");
-      switch (filters.sortBy) {
-        case "newest":
-          return yB - yA;
-        case "oldest":
-          return yA - yB;
-        case "most_viewed":
-          return vB - vA;
-        case "least_viewed":
-          return vA - vB;
-        default:
-          return 0;
-      }
-    });
-    return result;
-  }, [filters, searchTerm, activeData, isDataLoaded]); // Thêm activeData vào dependency
-
-  const totalPages = Math.ceil(filteredData.length / itemsPerPage);
-
+  // --- 3. HELPER: CẬP NHẬT URL ---
   const updateQuery = useCallback(
     (updates) => {
       const params = new URLSearchParams(searchParams.toString());
@@ -148,24 +139,32 @@ export default function HAnimeList() {
     [searchParams, pathname, router]
   );
 
-  // Reset về trang 1 nếu switch mode làm tổng số trang giảm xuống thấp hơn trang hiện tại
-  useEffect(() => {
-    if (currentPage > totalPages && totalPages > 0) {
-      updateQuery({ page: "1" });
-    }
-  }, [totalPages, currentPage, updateQuery]);
-
-  const paginatedData = useMemo(() => {
-    const start = (currentPage - 1) * itemsPerPage;
-    return filteredData.slice(start, start + itemsPerPage);
-  }, [filteredData, currentPage]);
-
+  // --- 4. DEBOUNCE SEARCH ---
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (localSearch !== searchTerm) updateQuery({ q: localSearch });
+      if (localSearch !== (searchParams.get("q") || "")) {
+        updateQuery({ q: localSearch });
+      }
     }, 400);
     return () => clearTimeout(timer);
-  }, [localSearch, updateQuery, searchTerm]);
+  }, [localSearch, updateQuery, searchParams]);
+
+  // --- 5. TÍNH TOÁN CỬA SỔ PHÂN TRANG ---
+  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  const paginationGroups = useMemo(() => {
+    let startL = Math.max(1, currentPage - 2);
+    let endL = Math.min(totalPages, startL + 4);
+    if (endL - startL < 4) startL = Math.max(1, endL - 4);
+    const leftPages = [];
+    for (let i = startL; i <= endL; i++) leftPages.push(i);
+
+    const rightPages = [];
+    const startR = Math.max(1, totalPages - 4);
+    for (let i = startR; i <= totalPages; i++) {
+      if (i > leftPages[leftPages.length - 1]) rightPages.push(i);
+    }
+    return { leftPages, rightPages };
+  }, [currentPage, totalPages]);
 
   useEffect(() => {
     setPageInput(currentPage.toString());
@@ -174,45 +173,17 @@ export default function HAnimeList() {
   const handlePageJump = (val) => {
     setPageInput(val);
     const p = parseInt(val);
-    if (p >= 1 && p <= totalPages) {
-      updateQuery({ page: p.toString() });
-    }
+    if (p >= 1 && p <= totalPages) updateQuery({ page: p.toString() });
   };
-
-  const handleReset = () => {
-    setLocalSearch("");
-    localStorage.removeItem(LOCAL_STORAGE_KEYS.LIST.PAGE);
-    router.push(pathname);
-  };
-
-  // 5. [CHANGE] Options (Filter) cũng phải cập nhật theo activeData
-  const options = useMemo(() => {
-    if (!isDataLoaded) return { genres: ["All"], studios: ["All"] };
-
-    const genres = new Set(),
-      studios = new Set();
-    activeData.forEach((item) => {
-      // <-- Dùng activeData
-      item.genres?.forEach((g) => genres.add(g.name));
-      item.studios?.forEach((s) => studios.add(s.name));
-    });
-    return {
-      genres: ["All", ...Array.from(genres).sort()],
-      studios: ["All", ...Array.from(studios).sort()],
-    };
-  }, [activeData, isDataLoaded]);
-
-  // UI Loading nhẹ nếu chưa đọc xong cookie (tránh flash data sai)
-  if (!isDataLoaded)
-    return <div className="p-10 text-center">Loading Library...</div>;
 
   return (
     <div
       className={`flex justify-center w-full min-h-screen py-10 transition-colors duration-500 ${
-        currentMode === "hanime" ? "bg-zinc-50" : "bg-blue-50" // [Optional] Đổi màu nền nhẹ theo mode
+        currentMode === "hanime" ? "bg-zinc-50" : "bg-blue-50"
       }`}
     >
       <main className="w-full max-w-6xl px-4 sm:px-10">
+        {/* HEADER SECTION */}
         <div className="flex flex-col items-start justify-between gap-4 mb-6 md:flex-row md:items-center">
           <div>
             <Link
@@ -221,7 +192,6 @@ export default function HAnimeList() {
             >
               <i className="bi bi-arrow-left"></i> Back
             </Link>
-            {/* 6. [CHANGE] Tiêu đề động */}
             <h1
               className={`mb-1 text-3xl font-semibold ${
                 currentMode === "hanime" ? "text-pink-600" : "text-blue-700"
@@ -230,11 +200,18 @@ export default function HAnimeList() {
               {currentMode === "hanime" ? "Thư viện HAnime" : "Thư viện Anime"}
             </h1>
             <p className="text-zinc-500">
-              Tổng cộng: <b>{filteredData.length}</b> bộ
+              Tổng cộng: <b>{totalItems}</b> bộ
             </p>
           </div>
+          <Link
+            href="/list/random"
+            className="gap-2 shadow btn btn-primary btn-lg d-flex align-items-center fw-bold rounded-pill"
+          >
+            Gacha Time :D
+          </Link>
         </div>
 
+        {/* SEARCH INPUT */}
         <div className="mb-6">
           <div className="relative">
             <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
@@ -243,79 +220,89 @@ export default function HAnimeList() {
             <input
               type="text"
               className="w-full py-3 pl-12 pr-4 transition-all bg-white border shadow-sm outline-none border-zinc-200 rounded-2xl focus:ring-2 focus:ring-primary"
-              placeholder={`Tìm kiếm ${
-                currentMode === "hanime" ? "Hentai..." : "Anime..."
-              }`}
+              placeholder={`Tìm kiếm trong ${
+                currentMode === "hanime" ? "H-Anime" : "Anime"
+              }...`}
               value={localSearch}
               onChange={(e) => setLocalSearch(e.target.value)}
             />
           </div>
         </div>
 
+        {/* FILTER BAR */}
         <FilterBar
           filters={filters}
-          options={options}
+          options={filterOptions}
+          loading={loadingFilters}
           onUpdate={(key, val) => updateQuery({ [key]: val })}
-          onReset={handleReset}
+          onReset={() => {
+            setLocalSearch("");
+            localStorage.removeItem(LOCAL_STORAGE_KEYS.LIST.PAGE);
+            router.push(pathname);
+          }}
         />
 
-        {/* Truyền activeData hoặc filteredData xuống Grid */}
-        <AnimeGrid data={paginatedData} />
+        {/* CONTENT GRID: XỬ LÝ SKELETON Ở ĐÂY */}
+        {isLoading ? (
+          // Grid wrapper dùng class Tailwind để khớp layout với AnimeGrid thật
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+            {/* Tạo mảng 20 phần tử rỗng để loop */}
+            {Array.from({ length: itemsPerPage }).map((_, index) => (
+              <AnimeCardSkeleton key={index} />
+            ))}
+          </div>
+        ) : (
+          <AnimeGrid data={activeData} />
+        )}
 
-        {/* --- PHÂN TRANG (Giữ nguyên) --- */}
+        {/* PAGINATION */}
         {totalPages > 1 && (
-          <div className="flex flex-col items-center justify-between gap-6 mt-12 mb-20 md:flex-row">
-            {/* ... Code phân trang giữ nguyên ... */}
-            <div className="flex gap-1">
-              {[...Array(Math.min(5, totalPages))].map((_, i) => (
+          <div className="flex flex-col items-center justify-between gap-4 mt-12 mb-20 md:flex-row">
+            {/* Cụm trang hiện tại (Trái) */}
+            <div className="flex gap-1 p-1 bg-white border shadow-sm rounded-2xl">
+              {paginationGroups.leftPages.map((pageNum) => (
                 <button
-                  key={i + 1}
-                  onClick={() => updateQuery({ page: (i + 1).toString() })}
+                  key={pageNum}
+                  onClick={() => updateQuery({ page: pageNum.toString() })}
                   className={`w-10 h-10 rounded-xl font-bold transition-all ${
-                    currentPage === i + 1
-                      ? "bg-primary text-white"
-                      : "bg-white border hover:bg-zinc-100"
+                    currentPage === pageNum
+                      ? "bg-primary text-white scale-105 shadow-md"
+                      : "hover:bg-zinc-100 text-zinc-600"
                   }`}
                 >
-                  {i + 1}
+                  {pageNum}
                 </button>
               ))}
             </div>
 
+            {/* Jump Box (Giữa) */}
             <div className="flex items-center gap-3 px-4 py-2 bg-white border shadow-sm rounded-2xl">
-              <span className="text-sm font-bold text-zinc-400">PAGE</span>
               <input
                 type="number"
-                className="w-16 p-1 font-bold text-center border-b-2 outline-none border-primary"
+                className="w-14 p-1 text-center font-bold border-b-2 border-primary outline-none focus:border-blue-600 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 value={pageInput}
                 onChange={(e) => handlePageJump(e.target.value)}
-                min="1"
-                max={totalPages}
               />
               <span className="text-sm font-bold text-zinc-400">
                 / {totalPages}
               </span>
             </div>
 
-            <div className="flex gap-1">
-              {totalPages > 5 &&
-                [...Array(Math.min(5, totalPages - 5))].map((_, i) => {
-                  const pageNum = totalPages - 4 + i;
-                  if (pageNum <= 5) return null;
-                  return (
-                    <button
-                      key={pageNum}
-                      onClick={() => updateQuery({ page: pageNum.toString() })}
-                      className={`w-10 h-10 rounded-xl font-bold transition-all ${
-                        currentPage === pageNum
-                          ? "bg-primary text-white"
-                          : "bg-white border hover:bg-zinc-100"
-                      }`}
-                    >
-                      {pageNum}
-                    </button>
-                  );
-                })}
+            {/* Cụm trang cuối (Phải) */}
+            <div className="flex gap-1 p-1 bg-white border shadow-sm rounded-2xl">
+              {paginationGroups.rightPages.map((pageNum) => (
+                <button
+                  key={pageNum}
+                  onClick={() => updateQuery({ page: pageNum.toString() })}
+                  className={`w-10 h-10 rounded-xl font-bold transition-all ${
+                    currentPage === pageNum
+                      ? "bg-primary text-white shadow-md"
+                      : "hover:bg-zinc-100 text-zinc-600"
+                  }`}
+                >
+                  {pageNum}
+                </button>
+              ))}
             </div>
           </div>
         )}

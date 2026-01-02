@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import "bootstrap/dist/css/bootstrap.min.css";
 import { useState } from "react";
-import { LOCAL_STORAGE_KEYS } from "@/app/constants/localKey";
+import { LOCAL_STORAGE_KEYS } from "@/constants/localKey";
 import { useMode } from "@/context/ModeContext"; // Import Context
 
 export default function GameList() {
@@ -16,14 +16,14 @@ export default function GameList() {
   const gamesData = [
     {
       // Dữ liệu chung (Giữ nguyên)
-      path: "/game/hanidle",
+      path: "/game/wordle",
       status: "active",
       color: "primary",
       localKey: LOCAL_STORAGE_KEYS.WORDLE.PROGRESS,
       // Dữ liệu riêng theo mode
       modes: {
         hanime: {
-          id: "hanidle",
+          id: "wordle",
           name: "H-Anidle",
           description:
             "Thử thách kiến thức văn hóa 'nhật bản'. Đoán tên phim dựa trên gợi ý.",
@@ -39,7 +39,7 @@ export default function GameList() {
       },
     },
     {
-      path: "/game/hentexto",
+      path: "/game/contexto",
       status: "active",
       color: "info",
       localKey: LOCAL_STORAGE_KEYS.CONTEXTO.PROGRESS,
@@ -61,14 +61,14 @@ export default function GameList() {
       },
     },
     {
-      path: "/game/hentohen",
+      path: "/game/tictactoe",
       status: "active",
       color: "success",
       localKey: LOCAL_STORAGE_KEYS.TICTACTOE.PROGRESS,
       modes: {
         hanime: {
-          id: "hentohen",
-          name: "HenToHen",
+          id: "tictactoe",
+          name: "TicTacToe",
           description:
             "Immaculate Grid phiên bản người lớn. Điền vào ô trống theo tiêu chí.",
           icon: "👅",

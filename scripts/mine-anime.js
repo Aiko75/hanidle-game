@@ -7,7 +7,7 @@ const path = require("path");
 const CONFIG = {
   BASE_URL: "https://animevietsub.show/anime-bo/trang-",
   DOMAIN: "https://animevietsub.show",
-  MAX_PAGES: 100,
+  MAX_PAGES: 1000,
   TIMEOUT: 15000,
   DELAY_MS: 500,
   OUTPUT_DIR: "public/data",

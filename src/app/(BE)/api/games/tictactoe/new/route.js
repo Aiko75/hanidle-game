@@ -1,31 +1,40 @@
 import { NextResponse } from "next/server";
-import hanimeData from "@/../public/data/ihentai_all.json";
-import animeData from "@/../public/data/anime_full.json";
+import pool from "@/lib/db";
 
-// Cấu hình
+export const dynamic = "force-dynamic";
+
 const MIN_ANIME_VIEWS = 1000;
 
 // --- CACHE ĐA CHẾ ĐỘ ---
-// Dùng object để lưu riêng cache cho từng mode
+// Lưu data vào RAM server để không phải query DB liên tục
 const GLOBAL_CACHE = {
   anime: null,
   hanime: null,
+  lastUpdated: { anime: 0, hanime: 0 },
 };
 
-// Helper: Trích xuất thuộc tính
+const CACHE_DURATION = 1000 * 60 * 60; // 1 tiếng
+
+// Helper: Trích xuất thuộc tính từ mảng anime
 function extractAttributes(data) {
   const genres = new Set();
   const studios = new Set();
   const years = new Set();
 
   data.forEach((item) => {
-    // Check an toàn hơn cho views
-    if ((item.views || 0) < MIN_ANIME_VIEWS) return;
-
-    item.genres?.forEach((g) => genres.add(g.name));
-    item.studios?.forEach((s) => studios.add(s.name));
-    if (item.releaseYear?.name) {
-      years.add(item.releaseYear.name);
+    // Genres và Studios trong DB là mảng JSONB
+    if (Array.isArray(item.genres)) {
+      item.genres.forEach((g) =>
+        genres.add(typeof g === "string" ? g : g.name)
+      );
+    }
+    if (Array.isArray(item.studios)) {
+      item.studios.forEach((s) =>
+        studios.add(typeof s === "string" ? s : s.name)
+      );
+    }
+    if (item.release_year) {
+      years.add(String(item.release_year));
     }
   });
 
@@ -36,23 +45,34 @@ function extractAttributes(data) {
   };
 }
 
-// Helper: Check điều kiện
+// Helper: Check điều kiện match
 function checkCondition(anime, attr) {
   if (!anime || !attr) return false;
 
   if (attr.type === "Genre") {
-    return anime.genres?.some((g) => g.name === attr.value);
+    return (
+      Array.isArray(anime.genres) &&
+      anime.genres.some(
+        (g) => (typeof g === "string" ? g : g.name) === attr.value
+      )
+    );
   }
   if (attr.type === "Studio") {
-    return anime.studios?.some((s) => s.name === attr.value);
+    return (
+      Array.isArray(anime.studios) &&
+      anime.studios.some(
+        (s) => (typeof s === "string" ? s : s.name) === attr.value
+      )
+    );
   }
   if (attr.type === "Year") {
-    return anime.releaseYear?.name === attr.value;
+    // So sánh string để an toàn
+    return String(anime.release_year) === String(attr.value);
   }
   return false;
 }
 
-// Helper: Kiểm tra tính khả thi
+// Helper: Kiểm tra tính khả thi (Có ít nhất 1 anime thỏa mãn cả Hàng & Cột)
 function hasSolution(data, rowAttr, colAttr) {
   return data.some((anime) => {
     const hasRow = checkCondition(anime, rowAttr);
@@ -61,36 +81,62 @@ function hasSolution(data, rowAttr, colAttr) {
   });
 }
 
-// [FIX 1] Thêm tham số request vào hàm
+// Hàm lấy dữ liệu từ DB (có Cache)
+async function getCachedData(mode) {
+  const now = Date.now();
+  // Nếu cache còn hạn, dùng luôn
+  if (
+    GLOBAL_CACHE[mode] &&
+    now - GLOBAL_CACHE.lastUpdated[mode] < CACHE_DURATION
+  ) {
+    return GLOBAL_CACHE[mode];
+  }
+
+  console.log(`🔄 Fetching DB for mode: ${mode}...`);
+  const tableName = mode === "hanime" ? "hanimes" : "animes";
+  const client = await pool.connect();
+
+  try {
+    // Chỉ lấy các trường cần thiết, lọc views ngay tại DB
+    const query = `
+            SELECT id, genres, studios, release_year 
+            FROM ${tableName} 
+            WHERE views >= $1
+        `;
+    const res = await client.query(query, [MIN_ANIME_VIEWS]);
+    const data = res.rows;
+
+    // Xây dựng cache mới
+    const cacheObj = {
+      data: data,
+      attributes: extractAttributes(data),
+    };
+
+    GLOBAL_CACHE[mode] = cacheObj;
+    GLOBAL_CACHE.lastUpdated[mode] = now;
+
+    console.log(`✅ Cached ${data.length} items for ${mode}.`);
+    return cacheObj;
+  } finally {
+    client.release();
+  }
+}
+
 export async function GET(request) {
   try {
-    // Lấy mode, mặc định là anime nếu không có header
-    const mode = request.headers.get("x-app-mode") || "anime";
+    const mode = request.headers.get("app_mode") || "anime";
 
-    // Chọn nguồn dữ liệu đúng
-    const sourceData = mode === "hanime" ? hanimeData : animeData;
-
-    // [FIX 2] Xử lý Cache theo mode để không bị lẫn lộn
-    if (!GLOBAL_CACHE[mode]) {
-      console.log(`🔄 Building cache for mode: ${mode}...`);
-      const filteredData = sourceData.filter(
-        (a) => (a.views || 0) >= MIN_ANIME_VIEWS
-      );
-
-      GLOBAL_CACHE[mode] = {
-        data: filteredData, // Lưu luôn data đã filter vào cache
-        attributes: extractAttributes(filteredData),
-      };
-    }
-
-    // Lấy dữ liệu từ Cache của mode hiện tại
-    const currentCache = GLOBAL_CACHE[mode];
-    const { data: filteredData, attributes: cachedAttributes } = currentCache;
+    // Lấy dữ liệu (Từ Cache hoặc DB)
+    const { data: filteredData, attributes: cachedAttributes } =
+      await getCachedData(mode);
 
     let board = null;
+    let attempts = 0;
 
-    // [FIX 3] Thêm điều kiện dừng an toàn (max 500 lần thử)
+    // Vòng lặp tạo bảng ngẫu nhiên
     while (!board) {
+      attempts++;
+
       const getRandomAttr = (excludeTypes = []) => {
         const types = ["Genre", "Studio", "Year"].filter(
           (t) => !excludeTypes.includes(t)
@@ -107,14 +153,10 @@ export async function GET(request) {
         return { type, value };
       };
 
-      // Random Hàng & Cột
       const rows = [];
       const cols = [];
 
-      // Tạo 3 hàng
       for (let i = 0; i < 3; i++) rows.push(getRandomAttr());
-
-      // Tạo 3 cột (Logic cũ của bạn OK)
       for (let i = 0; i < 3; i++) cols.push(getRandomAttr());
 
       let isValidBoard = true;
@@ -130,12 +172,12 @@ export async function GET(request) {
       if (isValidBoard) {
         for (let r = 0; r < 3; r++) {
           for (let c = 0; c < 3; c++) {
-            // Không để Năm giao với Năm
+            // Không để Năm giao với Năm (quá khó hoặc vô lý)
             if (rows[r].type === "Year" && cols[c].type === "Year") {
               isValidBoard = false;
               break;
             }
-            // Phải có nghiệm
+            // Phải có nghiệm trong DB
             if (!hasSolution(filteredData, rows[r], cols[c])) {
               isValidBoard = false;
               break;
@@ -152,11 +194,8 @@ export async function GET(request) {
 
     if (!board) {
       return NextResponse.json(
-        {
-          success: false,
-          message: "Failed to generate board, try again",
-        },
-        { status: 500 } // Trả về lỗi server nếu không tìm ra bảng
+        { success: false, message: "Failed to generate valid board" },
+        { status: 500 }
       );
     }
 
@@ -164,7 +203,7 @@ export async function GET(request) {
   } catch (error) {
     console.error("Board API Error:", error);
     return NextResponse.json(
-      { success: false, error: "Internal Server Error" },
+      { success: false, error: error.message },
       { status: 500 }
     );
   }

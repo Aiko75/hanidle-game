@@ -1,12 +1,12 @@
 import { Suspense } from "react";
-import HAnimeList from "@/pages/List/List";
+import List from "@/pages/List/List";
 
-export default function List() {
+export default function ListPage() {
   return (
     <Suspense
       fallback={<div className="p-10 text-center">Loading list...</div>}
     >
-      <HAnimeList />
+      <List />
     </Suspense>
   );
 }

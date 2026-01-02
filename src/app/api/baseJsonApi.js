@@ -11,7 +11,7 @@ class BaseJsonApi {
     // Cấu hình Header mặc định
     const headers = {
       "Content-Type": "application/json",
-      "x-app-mode": currentMode,
+      app_mode: currentMode,
       ...options.headers,
     };
 
